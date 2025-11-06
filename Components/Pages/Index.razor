@@ -1,0 +1,290 @@
+@page "/"
+@using InventoryManager.Models
+@inject IInventoryService InventoryService
+@inject ITagService TagService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@rendermode InteractiveServer
+
+<PageTitle>Universal Inventory Manager</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Universal Inventory Manager</h1>
+    <p class="page-subtitle">Create, manage, and share custom inventories with flexible schemas</p>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading inventories...</p>
+    </div>
+}
+else
+{
+    <!-- Public Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-4">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <div class="stat-icon">
+                        <i class="fas fa-warehouse"></i>
+                    </div>
+                    <div class="stat-number">@totalInventories</div>
+                    <div class="stat-label">Total Inventories</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <div class="stat-icon">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div class="stat-number">@totalItems</div>
+                    <div class="stat-label">Total Items</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-number">@totalCreators</div>
+                    <div class="stat-label">Inventory Creators</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Cloud Section -->
+    @if (popularTags.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-tags me-2"></i>Popular Tags
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="tag-cloud">
+                    @foreach (var tag in popularTags)
+                    {
+                        <a href="/search?q=@Uri.EscapeDataString(tag.Name)" class="tag-link @(GetTagSizeClass(tag.Count))" title="@tag.Count items">
+                            @tag.Name
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Latest Inventories -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>Latest Inventories
+                    </h3>
+                </div>
+                <div class="card-body">
+                    @if (!latestInventories.Any())
+                    {
+                        <div class="empty-state">
+                            <i class="fas fa-warehouse empty-state-icon"></i>
+                            <h3>No Inventories Yet</h3>
+                            <p>Be the first to create an inventory!</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row">
+                            @foreach (var inventory in latestInventories)
+                            {
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card item-card h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                @if (!string.IsNullOrEmpty(inventory.ImageUrl))
+                                                {
+                                                    <img src="@inventory.ImageUrl" alt="@inventory.Title" class="inventory-thumb me-3" />
+                                                }
+                                                else
+                                                {
+                                                    <div class="inventory-icon me-3">
+                                                        <i class="fas fa-warehouse"></i>
+                                                    </div>
+                                                }
+                                                <div>
+                                                    <h5 class="card-title mb-1">@inventory.Title</h5>
+                                                    <span class="inventory-category">@inventory.Category</span>
+                                                </div>
+                                            </div>
+                                            <p class="card-text text-muted">@(inventory.Description?.Length > 100 ? inventory.Description.Substring(0, 100) + "..." : inventory.Description)</p>
+                                            <div class="inventory-meta">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-user me-1"></i>@inventory.Creator?.Name
+                                                </small>
+                                                <small class="text-muted ms-3">
+                                                    <i class="fas fa-box me-1"></i>@inventory.Items.Count items
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer bg-white">
+                                            <button class="btn btn-sm btn-outline-primary w-100" @onclick="() => ViewInventory(inventory.Id)">
+                                                <i class="fas fa-eye me-1"></i>View Items
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top 5 Inventories -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-trophy me-2"></i>Top 5 Inventories
+                    </h3>
+                </div>
+                <div class="card-body">
+                    @if (!topInventories.Any())
+                    {
+                        <div class="empty-state">
+                            <i class="fas fa-trophy empty-state-icon"></i>
+                            <h3>No Inventories Yet</h3>
+                            <p>Inventories with the most items will appear here.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Title</th>
+                                        <th>Creator</th>
+                                        <th>Category</th>
+                                        <th>Items</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var (inventory, index) in topInventories.Select((inv, i) => (inv, i + 1)))
+                                    {
+                                        <tr>
+                                            <td>
+                                                @if (index <= 3)
+                                                {
+                                                    <span class="badge badge-warning">#@index</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge badge-secondary">#@index</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <strong>@inventory.Title</strong>
+                                            </td>
+                                            <td>@inventory.Creator?.Name</td>
+                                            <td>
+                                                <span class="badge badge-info">@inventory.Category</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-success">@inventory.Items.Count</span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" @onclick="() => ViewInventory(inventory.Id)">
+                                                    <i class="fas fa-eye me-1"></i>View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Inventory> allInventories = new();
+    private List<Inventory> latestInventories = new();
+    private List<Inventory> topInventories = new();
+    private List<TagWithCount> popularTags = new();
+    private bool isLoading = true;
+    private int totalInventories = 0;
+    private int totalItems = 0;
+    private int totalCreators = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            // Load all inventories (public view)
+            allInventories = await InventoryService.GetRecentInventoriesAsync(int.MaxValue);
+
+            // Load latest 6 inventories
+            latestInventories = allInventories
+                .OrderByDescending(i => i.Id)
+                .Take(6)
+                .ToList();
+
+            // Load top 5 inventories by item count
+            topInventories = allInventories
+                .OrderByDescending(i => i.Items.Count)
+                .Take(5)
+                .ToList();
+
+            // Calculate stats
+            totalInventories = allInventories.Count;
+            totalItems = allInventories.Sum(i => i.Items.Count);
+            totalCreators = allInventories.Select(i => i.CreatorId).Distinct().Count();
+
+            // Load popular tags
+            popularTags = await TagService.GetPopularTagsAsync(20);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ViewInventory(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/items");
+    }
+
+    private string GetTagSizeClass(int count)
+    {
+        // Return CSS class based on tag popularity
+        if (count >= 10) return "tag-large";
+        if (count >= 5) return "tag-medium";
+        return "tag-small";
+    }
+}

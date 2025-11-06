@@ -1,0 +1,47 @@
+@inject II18nService I18n
+@inject IJSRuntime JSRuntime
+
+<div class="language-selector">
+    <select class="form-select form-select-sm" @onchange="OnLanguageChange" value="@currentLanguage">
+        <option value="en">@I18n.GetLocalizedText("English")</option>
+        <option value="es">@I18n.GetLocalizedText("Spanish")</option>
+    </select>
+</div>
+
+@code {
+    private string currentLanguage = "en";
+    private bool isInitialized = false;
+    private bool jsAvailable = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isInitialized)
+        {
+            try
+            {
+                jsAvailable = true;
+                currentLanguage = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "language");
+                if (string.IsNullOrEmpty(currentLanguage))
+                {
+                    currentLanguage = "en";
+                }
+            }
+            catch
+            {
+                jsAvailable = false;
+                currentLanguage = "en";
+            }
+            isInitialized = true;
+        }
+    }
+
+    private async Task OnLanguageChange(ChangeEventArgs e)
+    {
+        currentLanguage = e.Value?.ToString() ?? "en";
+        if (jsAvailable)
+        {
+            await I18n.SetLanguageAsync(currentLanguage);
+        }
+        StateHasChanged();
+    }
+}

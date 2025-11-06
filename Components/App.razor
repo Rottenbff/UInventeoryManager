@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <div id="app">
+        <Routes />
+    </div>
+    
+    <div id="blazor-error-ui" style="display: none;">
+        <div class="alert alert-danger">
+            <h4>An unhandled error has occurred.</h4>
+            <button class="btn btn-primary" onclick="location.reload()">Reload</button>
+        </div>
+    </div>
+    
+    <script>
+        // Add error handling for Blazor
+        window.addEventListener('unhandledrejection', event => {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+
+        window.addEventListener('error', event => {
+            console.error('JavaScript error:', event.error);
+        });
+    </script>
+    
+    <script src="_framework/blazor.web.js"></script>
+    <script src="js/sortable.min.js"></script>
+    <script src="js/dragdrop-interop.js"></script>
+    <script>
+        // Blazor auto-starts - NO manual Blazor.start()
+        console.log('Blazor app initialized');
+    </script>
+</body>
+
+</html>

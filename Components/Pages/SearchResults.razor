@@ -1,0 +1,134 @@
+@page "/search"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IInventoryService InventoryService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Search Results</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Search Results</h1>
+    <p class="page-subtitle">Find inventories by title, description, or category</p>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Searching inventories...</p>
+    </div>
+}
+else if (searchResults != null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="section-title">Found @searchResults.Count inventories for "@searchTerm"</h2>
+        <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+            <i class="fas fa-times"></i> Clear Search
+        </button>
+    </div>
+
+    @if (searchResults.Any())
+    {
+        <div class="row">
+            @foreach (var inventory in searchResults)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card inventory-card">
+                        <div class="card-body">
+                            <div class="inventory-header">
+                                <h3 class="inventory-title">@inventory.Title</h3>
+                                <span class="inventory-category">@inventory.Category</span>
+                            </div>
+                            <p class="inventory-description">@inventory.Description</p>
+                            <div class="inventory-meta">
+                                <small class="text-muted">By @inventory.Creator?.Name</small>
+                            </div>
+                            <div class="inventory-actions">
+                                <button class="btn btn-primary btn-sm" @onclick="() => ViewInventory(inventory.Id)">
+                                    <i class="fas fa-eye"></i> View Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-search empty-state-icon"></i>
+            <h3>No Results Found</h3>
+            <p>Try adjusting your search terms or browse all inventories.</p>
+            <button class="btn btn-primary" @onclick="ClearSearch">
+                <i class="fas fa-undo"></i> Clear Search
+            </button>
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? q { get; set; }
+
+    private List<Inventory> searchResults = new();
+    private string searchTerm = "";
+    private bool isLoading = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Handle query parameter
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            searchTerm = q;
+            await PerformSearch();
+        }
+    }
+
+    private async Task PerformSearch()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            searchResults = new List<Inventory>();
+            return;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            searchResults = await InventoryService.SearchInventoriesAsync(searchTerm);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error searching inventories: {ex.Message}");
+            searchResults = new List<Inventory>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Search()
+    {
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            Navigation.NavigateTo($"/search?q={searchTerm}");
+        }
+    }
+
+    private void ClearSearch()
+    {
+        searchTerm = "";
+        searchResults = new List<Inventory>();
+        Navigation.NavigateTo("/");
+    }
+
+    private void ViewInventory(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/items");
+    }
+}

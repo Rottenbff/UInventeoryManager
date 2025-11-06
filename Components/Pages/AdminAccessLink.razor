@@ -1,0 +1,196 @@
+@page "/admin-access/{LinkId}"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Http
+@using InventoryManager.Services
+@using InventoryManager.Data
+@using InventoryManager.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@inject IAdminAccessService AdminAccessService
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject IHttpContextAccessor HttpContextAccessor
+@rendermode InteractiveServer
+
+<PageTitle>Admin Access</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mt-5">
+                <div class="card-header text-center">
+                    <h3>Admin Access Verification</h3>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Verifying access link...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-times-circle"></i> Access Denied</h5>
+                            <p class="mb-2">@errorMessage</p>
+                            <hr>
+                            <p class="mb-0"><strong>This is a one-time link.</strong> If you've already used it, the link is no longer valid.</p>
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="/" class="btn btn-primary">Go to Home</a>
+                        </div>
+                    }
+                    else if (isSuccess)
+                    {
+                        <div class="alert alert-success">
+                            <div class="text-center">
+                                <div class="spinner-border text-light mb-3" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <h5><i class="fas fa-check-circle"></i> Admin Access Granted!</h5>
+                                <p class="mb-3">You have been granted admin access. Logging you out now...</p>
+                                <p class="text-muted small">You will be redirected to the login page. Please sign in again to activate your new admin permissions.</p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <p>Please sign in to continue with admin access verification.</p>
+                        </div>
+                        <div class="text-center">
+                            <a href="/login" class="btn btn-primary w-100">Sign In</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string LinkId { get; set; } = string.Empty;
+
+    private bool isLoading = true;
+    private bool isSuccess = false;
+    private string errorMessage = string.Empty;
+    private string currentUserEmail = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ProcessAdminAccess();
+    }
+
+    private async Task ProcessAdminAccess()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            Console.WriteLine($"[DEBUG] Processing admin access for link: {LinkId}");
+
+            // First, check if user is authenticated
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!authState.User.Identity?.IsAuthenticated ?? true)
+            {
+                Console.WriteLine("[DEBUG] User not authenticated");
+                isLoading = false;
+                return;
+            }
+
+            Console.WriteLine("[DEBUG] User is authenticated");
+
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            currentUserEmail = authState.User.FindFirstValue(ClaimTypes.Email) ?? "Unknown";
+
+            Console.WriteLine($"[DEBUG] User ID: {userId}, Email: {currentUserEmail}");
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                Console.WriteLine("[DEBUG] User ID is null or empty");
+                errorMessage = "Invalid user session. Please sign in again.";
+                isLoading = false;
+                return;
+            }
+
+            // Validate the link
+            Console.WriteLine("[DEBUG] Validating link...");
+            var adminAccess = await AdminAccessService.ValidateLinkAsync(LinkId);
+
+            if (adminAccess == null)
+            {
+                Console.WriteLine("[DEBUG] Link validation failed, checking if link exists...");
+
+                // Check if the link exists but was already used
+                var linkExists = await DbContext.AdminAccesses.AnyAsync(a => a.GeneratedLink == LinkId);
+                Console.WriteLine($"[DEBUG] Link exists: {linkExists}");
+
+                if (linkExists)
+                {
+                    Console.WriteLine("[DEBUG] Link already used");
+                    errorMessage = "This admin access link has already been used. Admin access links are one-time only.";
+                }
+                else
+                {
+                    Console.WriteLine("[DEBUG] Link does not exist");
+                    errorMessage = "This admin access link does not exist or is invalid. Please contact your administrator for a new link.";
+                }
+                isLoading = false;
+                return;
+            }
+
+            Console.WriteLine("[DEBUG] Link validated successfully, using it to grant admin access...");
+            // Use the link to grant admin access
+            var success = await AdminAccessService.UseLinkAsync(LinkId, userId, currentUserEmail);
+
+            if (!success)
+            {
+                Console.WriteLine("[DEBUG] Failed to use link");
+                errorMessage = "Failed to process admin access. The link may have already been used.";
+                isLoading = false;
+                return;
+            }
+
+            Console.WriteLine("[DEBUG] Link used successfully, updating user to admin...");
+            // Update user to be admin
+            var user = await DbContext.Users.FirstOrDefaultAsync(u => u.Id == Guid.Parse(userId));
+            if (user != null)
+            {
+                Console.WriteLine($"[DEBUG] Found user in database, current IsAdmin: {user.IsAdmin}");
+                user.IsAdmin = true;
+                await DbContext.SaveChangesAsync();
+                Console.WriteLine($"[DEBUG] User updated to admin, IsAdmin is now: {user.IsAdmin}");
+
+                isSuccess = true;
+                isLoading = false;
+
+                // Force logout to refresh claims
+                Console.WriteLine("[DEBUG] Forcing logout to refresh authentication claims...");
+                await HttpContextAccessor.HttpContext.SignOutAsync();
+
+                // Redirect to login after showing success
+                await Task.Delay(2000);
+                Console.WriteLine("[DEBUG] Redirecting to login page...");
+                Navigation.NavigateTo("/login?message=" + Uri.EscapeDataString("Admin access granted! Please sign in again to activate your new permissions."));
+            }
+            else
+            {
+                Console.WriteLine("[DEBUG] User not found in database");
+                errorMessage = "User not found. Please contact your administrator.";
+                isLoading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+            isLoading = false;
+        }
+    }
+}

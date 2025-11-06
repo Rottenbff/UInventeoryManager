@@ -1,0 +1,281 @@
+@page "/inventory/{inventoryId}/discussion"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ICommentService CommentService
+@inject IInventoryService InventoryService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.SignalR.Client
+@rendermode InteractiveServer
+
+@implements IAsyncDisposable
+
+<PageTitle>Inventory Discussion</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Discussion</h1>
+    <p class="page-subtitle">Collaborate with others on this inventory</p>
+    @if (hubConnection != null)
+    {
+        <span class="badge @(isConnected ? "bg-success" : "bg-warning") ms-2">
+            <i class="fas @(isConnected ? "fa-wifi" : "fa-wifi-slash")"></i>
+            SignalR: @hubConnection.State
+        </span>
+    }
+</div>
+
+@if (inventory == null)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading inventory...</p>
+    </div>
+}
+else if (comments == null)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading comments...</p>
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+                <div class="inventory-icon me-3">
+                    <i class="fas fa-warehouse"></i>
+                </div>
+                <div>
+                    <h3 class="inventory-title mb-1">@inventory.Title</h3>
+                    <p class="inventory-description mb-0">@inventory.Description</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0">Add a Comment</h4>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <textarea class="form-control" rows="3" placeholder="Write your comment here..." @bind="newCommentContent"></textarea>
+            </div>
+            <button class="btn btn-primary" @onclick="AddComment" disabled="@(string.IsNullOrWhiteSpace(newCommentContent))">
+                <i class="fas fa-paper-plane"></i> Post Comment
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Comments (@comments.Count)</h4>
+        </div>
+        <div class="card-body">
+            @if (comments.Any())
+            {
+                <div class="comments-list">
+                    @foreach (var comment in comments)
+                    {
+                        <div class="comment-item border-bottom pb-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="comment-author">
+                                    <strong>@comment.User?.Name</strong>
+                                </div>
+                                <small class="text-muted">@comment.CreatedAt.ToString("g")</small>
+                            </div>
+                            <p class="comment-content mt-2 mb-0">@comment.Content</p>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state-secondary">
+                    <p>No comments yet. Be the first to comment!</p>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string inventoryId { get; set; } = string.Empty;
+
+    private Inventory? inventory;
+    private List<Comment> comments = new();
+    private string newCommentContent = "";
+    private Guid currentUserId;
+    private HubConnection? hubConnection;
+    private bool isConnected = false;
+
+    public class SignalRCommentDto
+    {
+        public Guid Id { get; set; }
+        public Guid InventoryId { get; set; }
+        public Guid UserId { get; set; }
+        public string Content { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public string UserName { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+
+        if (Guid.TryParse(inventoryId, out var id))
+        {
+            inventory = await InventoryService.GetInventoryByIdAsync(id);
+            if (inventory == null)
+            {
+                Navigation.NavigateTo("/my-inventories");
+                return;
+            }
+
+            await LoadComments();
+            await SetupSignalR();
+
+            // Set up a timer to refresh comments every 10 seconds as fallback when SignalR is not connected
+            _ = Task.Run(async () =>
+            {
+                while (!string.IsNullOrEmpty(inventoryId))
+                {
+                    await Task.Delay(10000);
+                    if (hubConnection?.State == HubConnectionState.Connected)
+                    {
+                        // SignalR is working, stop polling
+                        Console.WriteLine("SignalR connected - stopping fallback polling");
+                        break;
+                    }
+                    else
+                    {
+                        // SignalR not connected, refresh comments as fallback
+                        Console.WriteLine("SignalR not connected - refreshing comments via fallback");
+                        await InvokeAsync(async () => await LoadComments());
+                    }
+                }
+            });
+        }
+        else
+        {
+            Navigation.NavigateTo("/my-inventories");
+        }
+    }
+
+    private async Task SetupSignalR()
+    {
+        try
+        {
+            Console.WriteLine("Setting up SignalR connection...");
+
+            // In Blazor Server, SignalR automatically uses the same authentication as the page
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/comments"))
+                .WithAutomaticReconnect(new[]
+                {
+                    TimeSpan.FromSeconds(0),
+                    TimeSpan.FromSeconds(2),
+                    TimeSpan.FromSeconds(5),
+                    TimeSpan.FromSeconds(30)
+                })
+                .Build();
+
+            // Handle new comment from SignalR
+            hubConnection.On<SignalRCommentDto>("ReceiveNewComment", (commentData) =>
+            {
+                // Create a new Comment object
+                var newComment = new Comment
+                {
+                    Id = commentData.Id,
+                    InventoryId = commentData.InventoryId,
+                    UserId = commentData.UserId,
+                    Content = commentData.Content,
+                    CreatedAt = commentData.CreatedAt,
+                    User = new User
+                    {
+                        Name = commentData.UserName,
+                        Email = ""
+                    }
+                };
+
+                // Add to the comments list (avoid duplicates)
+                if (!comments.Any(c => c.Id == newComment.Id))
+                {
+                    comments.Add(newComment);
+                    InvokeAsync(StateHasChanged);
+                }
+            });
+
+            hubConnection.Reconnecting += (error) =>
+            {
+                isConnected = false;
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Reconnected += (connectionId) =>
+            {
+                isConnected = true;
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Closed += (error) =>
+            {
+                isConnected = false;
+                return Task.CompletedTask;
+            };
+
+            await hubConnection.StartAsync();
+            isConnected = true;
+
+            // Join the inventory group
+            await hubConnection.SendAsync("JoinInventoryGroup", inventoryId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting up SignalR: {ex.Message}");
+            isConnected = false;
+        }
+    }
+
+    private async Task LoadComments()
+    {
+        comments = await CommentService.GetCommentsForInventoryAsync(inventory!.Id);
+        StateHasChanged();
+    }
+
+    private async Task AddComment()
+    {
+        if (string.IsNullOrWhiteSpace(newCommentContent) || inventory == null)
+            return;
+
+        var comment = new Comment
+        {
+            Id = Guid.NewGuid(),
+            InventoryId = inventory.Id,
+            UserId = currentUserId,
+            Content = newCommentContent.Trim()
+        };
+
+        try
+        {
+            await CommentService.CreateCommentAsync(comment);
+            newCommentContent = "";
+            // Note: No need to call LoadComments() here - SignalR will update the UI
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error adding comment: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.SendAsync("LeaveInventoryGroup", inventoryId);
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

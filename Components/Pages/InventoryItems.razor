@@ -1,0 +1,613 @@
+@page "/inventory/{inventoryId}/items"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IInventoryService InventoryService
+@inject ILikeService LikeService
+@inject IInventoryAccessService InventoryAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Inventory Items</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Inventory Items</h1>
+    <p class="page-subtitle">Manage items in your inventory</p>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+        <button class="btn-close" @onclick="() => errorMessage = null">&times;</button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">
+        @successMessage
+        <button class="btn-close" @onclick="() => successMessage = null">&times;</button>
+    </div>
+}
+
+@if (inventory == null)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading inventory...</p>
+    </div>
+}
+else if (!hasWriteAccess && !isOwner)
+{
+    <div class="alert alert-warning">
+        <h4>Read-Only Access</h4>
+        <p>You only have read-only access to this inventory. Contact the owner to request write access.</p>
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="section-title">@inventory.Title</h2>
+        <div>
+            <a href="/inventory/@inventoryId/discussion" class="btn btn-outline-secondary">
+                <i class="fas fa-comments"></i> Discussion
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="section-title">@inventory.Title</h2>
+        <div>
+            <button class="btn btn-primary me-2" @onclick="ShowAddItemModal">
+                <i class="fas fa-plus"></i> Add Item
+            </button>
+            <a href="/inventory/@inventoryId/discussion" class="btn btn-outline-secondary">
+                <i class="fas fa-comments"></i> Discussion
+            </a>
+        </div>
+    </div>
+}
+
+@if (inventory != null)
+{
+    @if (items.Any())
+    {
+        <div class="card">
+            <div class="card-body">
+                @if (hasWriteAccess || isOwner)
+                {
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="toolbar-actions">
+                            <button class="btn btn-primary me-2" @onclick="EditSelectedItem" disabled="@(selectedItems.Count != 1)">
+                                <i class="fas fa-edit"></i> Edit Selected
+                            </button>
+                            <button class="btn btn-danger" @onclick="DeleteSelectedItems" disabled="@(selectedItems.Count == 0)">
+                                <i class="fas fa-trash"></i> Delete Selected (@selectedItems.Count)
+                            </button>
+                        </div>
+                    </div>
+                }
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                @if (hasWriteAccess || isOwner)
+                                {
+                                    <th style="width: 50px;">
+                                        <input type="checkbox" @onchange="ToggleSelectAll" checked="@SelectAllChecked" />
+                                    </th>
+                                }
+                                <th>Custom ID</th>
+                                <th>Image</th>
+                                <!-- Add custom field headers dynamically -->
+                                @if (inventory.CustomString1Enabled && !string.IsNullOrEmpty(inventory.CustomString1Name))
+                                {
+                                    <th>@inventory.CustomString1Name</th>
+                                }
+                                @if (inventory.CustomString2Enabled && !string.IsNullOrEmpty(inventory.CustomString2Name))
+                                {
+                                    <th>@inventory.CustomString2Name</th>
+                                }
+                                @if (inventory.CustomString3Enabled && !string.IsNullOrEmpty(inventory.CustomString3Name))
+                                {
+                                    <th>@inventory.CustomString3Name</th>
+                                }
+                                @if (inventory.CustomInt1Enabled && !string.IsNullOrEmpty(inventory.CustomInt1Name))
+                                {
+                                    <th>@inventory.CustomInt1Name</th>
+                                }
+                                @if (inventory.CustomInt2Enabled && !string.IsNullOrEmpty(inventory.CustomInt2Name))
+                                {
+                                    <th>@inventory.CustomInt2Name</th>
+                                }
+                                @if (inventory.CustomInt3Enabled && !string.IsNullOrEmpty(inventory.CustomInt3Name))
+                                {
+                                    <th>@inventory.CustomInt3Name</th>
+                                }
+                                @if (inventory.CustomBool1Enabled && !string.IsNullOrEmpty(inventory.CustomBool1Name))
+                                {
+                                    <th>@inventory.CustomBool1Name</th>
+                                }
+                                @if (inventory.CustomBool2Enabled && !string.IsNullOrEmpty(inventory.CustomBool2Name))
+                                {
+                                    <th>@inventory.CustomBool2Name</th>
+                                }
+                                @if (inventory.CustomBool3Enabled && !string.IsNullOrEmpty(inventory.CustomBool3Name))
+                                {
+                                    <th>@inventory.CustomBool3Name</th>
+                                }
+                                <th>Likes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in items)
+                            {
+                                var likeCount = likeCounts.GetValueOrDefault(item.Id, 0);
+                                var isLiked = userLikes.GetValueOrDefault(item.Id, false);
+                                <tr>
+                                    @if (hasWriteAccess || isOwner)
+                                    {
+                                        <td>
+                                            <input type="checkbox" @onchange="() => ToggleSelectItem(item)" checked="@selectedItems.Contains(item.Id)" />
+                                        </td>
+                                    }
+                                    <td>@item.CustomItemId</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                        {
+                                            <img src="@item.ImageUrl" alt="Item Image" style="max-width: 60px; max-height: 60px; border-radius: 4px;" />
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                    <!-- Add custom field values dynamically -->
+                                    @if (inventory.CustomString1Enabled && !string.IsNullOrEmpty(inventory.CustomString1Name))
+                                    {
+                                        <td>@item.CustomString1Value</td>
+                                    }
+                                    @if (inventory.CustomString2Enabled && !string.IsNullOrEmpty(inventory.CustomString2Name))
+                                    {
+                                        <td>@item.CustomString2Value</td>
+                                    }
+                                    @if (inventory.CustomString3Enabled && !string.IsNullOrEmpty(inventory.CustomString3Name))
+                                    {
+                                        <td>@item.CustomString3Value</td>
+                                    }
+                                    @if (inventory.CustomInt1Enabled && !string.IsNullOrEmpty(inventory.CustomInt1Name))
+                                    {
+                                        <td>@item.CustomInt1Value</td>
+                                    }
+                                    @if (inventory.CustomInt2Enabled && !string.IsNullOrEmpty(inventory.CustomInt2Name))
+                                    {
+                                        <td>@item.CustomInt2Value</td>
+                                    }
+                                    @if (inventory.CustomInt3Enabled && !string.IsNullOrEmpty(inventory.CustomInt3Name))
+                                    {
+                                        <td>@item.CustomInt3Value</td>
+                                    }
+                                    @if (inventory.CustomBool1Enabled && !string.IsNullOrEmpty(inventory.CustomBool1Name))
+                                    {
+                                        <td>@(item.CustomBool1Value.HasValue ? (item.CustomBool1Value.Value ? "Yes" : "No") : "")</td>
+                                    }
+                                    @if (inventory.CustomBool2Enabled && !string.IsNullOrEmpty(inventory.CustomBool2Name))
+                                    {
+                                        <td>@(item.CustomBool2Value.HasValue ? (item.CustomBool2Value.Value ? "Yes" : "No") : "")</td>
+                                    }
+                                    @if (inventory.CustomBool3Enabled && !string.IsNullOrEmpty(inventory.CustomBool3Name))
+                                    {
+                                        <td>@(item.CustomBool3Value.HasValue ? (item.CustomBool3Value.Value ? "Yes" : "No") : "")</td>
+                                    }
+                                    <td>
+                                        <button class="btn @(isLiked ? "btn-danger" : "btn-outline-danger") btn-sm" @onclick="() => ToggleLike(item.Id)">
+                                            <i class="fas fa-heart@(isLiked ? "-fill" : "")"></i> @likeCount
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-box-open empty-state-icon"></i>
+            <h3>No Items Yet</h3>
+            <p>This inventory doesn't have any items yet.</p>
+            @if (hasWriteAccess || isOwner)
+            {
+                <button class="btn btn-primary" @onclick="ShowAddItemModal">
+                    <i class="fas fa-plus"></i> Add Your First Item
+                </button>
+            }
+        </div>
+    }
+}
+
+<!-- Add/Edit Item Modal -->
+@if (hasWriteAccess || isOwner)
+{
+    @if (showItemModal)
+    {
+        <div class="modal" style="display: block;">
+            <div class="modal-content modal-lg">
+                <div class="modal-header">
+                    <h3 class="modal-title">@(editingItem?.Id == Guid.Empty ? "Add" : "Edit") Item</h3>
+                    <button class="btn-close" @onclick="CloseItemModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(itemErrorMessage))
+                    {
+                        <div class="alert alert-danger">@itemErrorMessage</div>
+                    }
+                    @if (editingItem != null)
+                    {
+                        <SimplifiedItemEditor Item="editingItem" Inventory="inventory!" ItemChanged="OnItemChanged" />
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseItemModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveItem">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Delete Confirmation Modal -->
+@if (hasWriteAccess || isOwner)
+{
+    @if (showDeleteModal)
+    {
+        <div class="modal" style="display: block;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Confirm Delete</h3>
+                    <button class="btn-close" @onclick="CloseDeleteModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the item "@itemToDelete?.CustomItemId"? This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseDeleteModal">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDeleteItem">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string inventoryId { get; set; } = string.Empty;
+
+    private Inventory? inventory;
+    private List<Item> items = new();
+    private Item? editingItem;
+    private Item? itemToDelete;
+    private bool showItemModal = false;
+    private bool showDeleteModal = false;
+    private Item? itemToEdit; // Store reference to the original item
+    private Guid currentUserId;
+    private Dictionary<Guid, int> likeCounts = new();
+    private Dictionary<Guid, bool> userLikes = new();
+    private bool hasWriteAccess = false;
+    private bool isOwner = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? itemErrorMessage;
+    private HashSet<Guid> selectedItems = new();
+    private bool SelectAllChecked => selectedItems.Count == items.Count && items.Count > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+
+        if (Guid.TryParse(inventoryId, out var id))
+        {
+            inventory = await InventoryService.GetInventoryByIdAsync(id);
+            if (inventory == null)
+            {
+                Navigation.NavigateTo("/my-inventories");
+                return;
+            }
+
+            // Check access permissions
+            isOwner = inventory.CreatorId == currentUserId;
+            hasWriteAccess = await InventoryAccessService.HasWriteAccessAsync(inventory.Id, currentUserId);
+
+            // Load items for this inventory
+            await LoadItems();
+            await LoadLikeData();
+        }
+        else
+        {
+            Navigation.NavigateTo("/my-inventories");
+        }
+    }
+
+    private async Task LoadItems()
+    {
+        if (inventory != null)
+        {
+            items = await InventoryService.GetItemsForInventoryAsync(inventory.Id);
+        }
+    }
+
+    private async Task LoadLikeData()
+    {
+        likeCounts.Clear();
+        userLikes.Clear();
+
+        foreach (var item in items)
+        {
+            likeCounts[item.Id] = await LikeService.GetLikeCountAsync(item.Id);
+            userLikes[item.Id] = await LikeService.IsItemLikedByUserAsync(item.Id, currentUserId);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ToggleLike(Guid itemId)
+    {
+        var item = items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null) return;
+
+        var isCurrentlyLiked = userLikes.GetValueOrDefault(itemId, false);
+
+        try
+        {
+            if (isCurrentlyLiked)
+            {
+                await LikeService.UnlikeItemAsync(itemId, currentUserId);
+            }
+            else
+                {
+                await LikeService.LikeItemAsync(itemId, currentUserId);
+            }
+
+            // Refresh like data
+            await LoadLikeData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error toggling like: {ex.Message}";
+        }
+    }
+
+    private void ShowAddItemModal()
+    {
+        if (!hasWriteAccess && !isOwner) return;
+
+        editingItem = new Item
+        {
+            Id = Guid.Empty,
+            InventoryId = inventory!.Id,
+            CustomItemId = ""
+        };
+        itemToEdit = null; // No item being edited
+        itemErrorMessage = null;
+        showItemModal = true;
+    }
+
+    private void EditItem(Item item)
+    {
+        if (!hasWriteAccess && !isOwner) return;
+
+        // Store reference to the original item
+        itemToEdit = item;
+        
+        // Create a copy for editing to avoid EF tracking issues
+        editingItem = new Item
+        {
+            Id = item.Id,
+            InventoryId = item.InventoryId,
+            CustomItemId = item.CustomItemId,
+            CustomString1Value = item.CustomString1Value,
+            CustomString2Value = item.CustomString2Value,
+            CustomString3Value = item.CustomString3Value,
+            CustomInt1Value = item.CustomInt1Value,
+            CustomInt2Value = item.CustomInt2Value,
+            CustomInt3Value = item.CustomInt3Value,
+            CustomBool1Value = item.CustomBool1Value,
+            CustomBool2Value = item.CustomBool2Value,
+            CustomBool3Value = item.CustomBool3Value
+        };
+        itemErrorMessage = null;
+        showItemModal = true;
+    }
+
+    private void OnItemChanged(Item item)
+    {
+        // Handle item changes from the ItemEditor component
+        StateHasChanged();
+    }
+
+    private async Task SaveItem()
+    {
+        if (editingItem != null && (hasWriteAccess || isOwner))
+        {
+            try
+            {
+                if (editingItem.Id == Guid.Empty)
+                {
+                    // Add new item
+                    var savedItem = await InventoryService.CreateItemAsync(editingItem);
+                    items.Add(savedItem);
+                    successMessage = "Item added successfully.";
+                }
+                else
+                {
+                    // Update existing item
+                    // Use the original item reference to avoid EF tracking issues
+                    if (itemToEdit != null)
+                    {
+                        // Update the properties of the original item
+                        itemToEdit.CustomItemId = editingItem.CustomItemId;
+                        itemToEdit.ImageUrl = editingItem.ImageUrl;
+                        itemToEdit.CustomString1Value = editingItem.CustomString1Value;
+                        itemToEdit.CustomString2Value = editingItem.CustomString2Value;
+                        itemToEdit.CustomString3Value = editingItem.CustomString3Value;
+                        itemToEdit.CustomInt1Value = editingItem.CustomInt1Value;
+                        itemToEdit.CustomInt2Value = editingItem.CustomInt2Value;
+                        itemToEdit.CustomInt3Value = editingItem.CustomInt3Value;
+                        itemToEdit.CustomBool1Value = editingItem.CustomBool1Value;
+                        itemToEdit.CustomBool2Value = editingItem.CustomBool2Value;
+                        itemToEdit.CustomBool3Value = editingItem.CustomBool3Value;
+                        
+                        var savedItem = await InventoryService.UpdateItemAsync(itemToEdit);
+                        var index = items.FindIndex(i => i.Id == savedItem.Id);
+                        if (index >= 0)
+                        {
+                            items[index] = savedItem;
+                        }
+                        successMessage = "Item updated successfully.";
+                    }
+                }
+                
+                // Refresh like data for the new item
+                await LoadLikeData();
+                CloseItemModal();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Unable to generate a unique custom ID"))
+            {
+                itemErrorMessage = ex.Message;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+            {
+                itemErrorMessage = ex.Message + " Please refresh the page and try again.";
+            }
+            catch (Exception ex)
+            {
+                itemErrorMessage = $"Error saving item: {ex.Message}";
+            }
+        }
+    }
+
+    private void CloseItemModal()
+    {
+        showItemModal = false;
+        editingItem = null;
+        itemToEdit = null;
+        itemErrorMessage = null;
+    }
+
+    private void DeleteItem(Item item)
+    {
+        if (!hasWriteAccess && !isOwner) return;
+
+        itemToDelete = item;
+        showDeleteModal = true;
+    }
+
+    private async Task ConfirmDeleteItem()
+    {
+        if (itemToDelete != null && (hasWriteAccess || isOwner))
+        {
+            try
+            {
+                await InventoryService.DeleteItemAsync(itemToDelete.Id);
+                items.RemoveAll(i => i.Id == itemToDelete.Id);
+                likeCounts.Remove(itemToDelete.Id);
+                userLikes.Remove(itemToDelete.Id);
+                successMessage = "Item deleted successfully.";
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+            {
+                errorMessage = ex.Message + " Please refresh the page and try again.";
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error deleting item: {ex.Message}";
+            }
+        }
+        CloseDeleteModal();
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        itemToDelete = null;
+    }
+
+    private void ToggleItemSelection(Guid itemId)
+    {
+        if (selectedItems.Contains(itemId))
+        {
+            selectedItems.Remove(itemId);
+        }
+        else
+        {
+            selectedItems.Add(itemId);
+        }
+        StateHasChanged();
+    }
+
+    private void ToggleSelectAll()
+    {
+        if (selectedItems.Count == items.Count)
+        {
+            selectedItems.Clear();
+        }
+        else
+        {
+            selectedItems = items.Select(i => i.Id).ToHashSet();
+        }
+        StateHasChanged();
+    }
+
+    private void EditSelectedItem()
+    {
+        if (selectedItems.Count == 1)
+        {
+            var itemId = selectedItems.First();
+            var item = items.FirstOrDefault(i => i.Id == itemId);
+            if (item != null)
+            {
+                EditItem(item);
+            }
+        }
+    }
+
+    private async Task DeleteSelectedItems()
+    {
+        if (selectedItems.Count == 0) return;
+
+        if (selectedItems.Count == 1)
+        {
+            // Delete single item with confirmation modal
+            var itemId = selectedItems.First();
+            var item = items.FirstOrDefault(i => i.Id == itemId);
+            if (item != null)
+            {
+                DeleteItem(item);
+            }
+        }
+        else
+        {
+            // Batch delete - show confirmation
+            var count = selectedItems.Count;
+            successMessage = $"Selected items ({count}) would be deleted. This feature will be implemented.";
+            selectedItems.Clear();
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleSelectItem(Item item)
+    {
+        if (selectedItems.Contains(item.Id))
+        {
+            selectedItems.Remove(item.Id);
+        }
+        else
+        {
+            selectedItems.Add(item.Id);
+        }
+        StateHasChanged();
+    }
+}

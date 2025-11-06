@@ -1,0 +1,21 @@
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<div class="search-container">
+    <i class="fas fa-search search-icon"></i>
+    <input type="text" class="search-input" placeholder="Search inventories..." @bind="searchTerm" @onkeypress="HandleSearchKeyPress" />
+</div>
+
+@code {
+    private string searchTerm = "";
+
+    private void HandleSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm;
+            searchTerm = "";  // Clear after capturing
+            Navigation.NavigateTo($"/search?q={term}");
+        }
+    }
+}

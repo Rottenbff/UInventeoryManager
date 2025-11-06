@@ -1,0 +1,353 @@
+@page "/my-inventories"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IInventoryService InventoryService
+@inject IInventoryAccessService InventoryAccessService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>My Inventories</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">My Inventories</h1>
+    <p class="page-subtitle">Manage your inventory collections and items</p>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+        <button class="btn-close" @onclick="() => errorMessage = null">&times;</button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">
+        @successMessage
+        <button class="btn-close" @onclick="() => successMessage = null">&times;</button>
+    </div>
+}
+
+@if (inventories == null)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading your inventories...</p>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="section-title">Your Inventories</h2>
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <i class="fas fa-plus"></i> Create New Inventory
+        </button>
+    </div>
+
+    @if (inventories.Any())
+    {
+        <div class="row">
+            @foreach (var inventory in inventories)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card inventory-card">
+                        <div class="card-body">
+                            <div class="inventory-header">
+                                <h3 class="inventory-title">@inventory.Title</h3>
+                                <span class="inventory-category">@inventory.Category</span>
+                            </div>
+                            <p class="inventory-description">@inventory.Description</p>
+                            <div class="inventory-actions">
+                                <button class="btn btn-primary btn-sm" @onclick="() => ViewInventory(inventory.Id)">
+                                    <i class="fas fa-eye"></i> View Items
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => ConfigureInventory(inventory.Id)">
+                                    <i class="fas fa-cog"></i> Settings
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteInventory(inventory.Id)">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <i class="fas fa-warehouse empty-state-icon"></i>
+            <h3>No Inventories Yet</h3>
+            <p>Create your first inventory to get started managing your items.</p>
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="fas fa-plus"></i> Create Your First Inventory
+            </button>
+        </div>
+    }
+}
+
+@if (inventoriesWithAccess != null)
+{
+    <h2 class="section-title mt-5">Inventories You Have Write Access To</h2>
+    
+    @if (inventoriesWithAccess.Any())
+    {
+        <div class="row">
+            @foreach (var inventory in inventoriesWithAccess)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card inventory-card">
+                        <div class="card-body">
+                            <div class="inventory-header">
+                                <h3 class="inventory-title">@inventory.Title</h3>
+                                <span class="inventory-category">@inventory.Category</span>
+                            </div>
+                            <p class="inventory-description">@inventory.Description</p>
+                            <div class="inventory-meta">
+                                <small class="text-muted">Owner: @inventory.Creator?.Name</small>
+                            </div>
+                            <div class="inventory-actions">
+                                <button class="btn btn-primary btn-sm" @onclick="() => ViewInventory(inventory.Id)">
+                                    <i class="fas fa-eye"></i> View Items
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state-secondary">
+            <p>You don't have write access to any other inventories.</p>
+        </div>
+    }
+}
+
+<!-- Create/Edit Inventory Modal -->
+@if (showInventoryModal)
+{
+    <div class="modal" style="display: block;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">@(editingInventory?.Id == Guid.Empty ? "Create" : "Edit") Inventory</h3>
+                <button class="btn-close" @onclick="CloseInventoryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(inventoryErrorMessage))
+                {
+                    <div class="alert alert-danger">@inventoryErrorMessage</div>
+                }
+                @if (editingInventory != null)
+                {
+                    <div class="form-group">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" @bind="editingInventory.Title" placeholder="Enter inventory title" />
+                    </div>
+                    <div class="form-group">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" @bind="editingInventory.Description" placeholder="Enter inventory description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="category" class="form-label">Category</label>
+                        <input type="text" class="form-control" id="category" @bind="editingInventory.Category" placeholder="Enter category" />
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseInventoryModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveInventory">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal)
+{
+    <div class="modal" style="display: block;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirm Delete</h3>
+                <button class="btn-close" @onclick="CloseDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this inventory? This action cannot be undone and will delete all items in this inventory.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseDeleteModal">Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDeleteInventory">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Inventory> inventories = new();
+    private List<Inventory> inventoriesWithAccess = new();
+    private Inventory? editingInventory;
+    private Guid inventoryToDelete;
+    private bool showInventoryModal = false;
+    private bool showDeleteModal = false;
+    private Guid currentUserId;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? inventoryErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+
+        await LoadInventories();
+        await LoadInventoriesWithAccess();
+    }
+
+    private async Task LoadInventories()
+    {
+        try
+        {
+            inventories = await InventoryService.GetInventoriesForUserAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading inventories: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+    
+    private async Task LoadInventoriesWithAccess()
+    {
+        try
+        {
+            inventoriesWithAccess = await InventoryAccessService.GetInventoriesWithWriteAccessAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading inventories with access: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+
+    private void ShowCreateModal()
+    {
+        editingInventory = new Inventory
+        {
+            Id = Guid.Empty,
+            CreatorId = currentUserId,
+            Title = "",
+            Description = "",
+            Category = ""
+        };
+        inventoryErrorMessage = null;
+        showInventoryModal = true;
+    }
+
+    private void EditInventory(Inventory inventory)
+    {
+        editingInventory = new Inventory
+        {
+            Id = inventory.Id,
+            CreatorId = inventory.CreatorId,
+            Title = inventory.Title,
+            Description = inventory.Description ?? "",
+            Category = inventory.Category ?? ""
+        };
+        inventoryErrorMessage = null;
+        showInventoryModal = true;
+    }
+
+    private async Task SaveInventory()
+    {
+        if (editingInventory != null)
+        {
+            try
+            {
+                if (editingInventory.Id == Guid.Empty)
+                {
+                    // Create new inventory
+                    editingInventory.Id = Guid.NewGuid();
+                    editingInventory.CreatorId = currentUserId;
+                    await InventoryService.CreateInventoryAsync(editingInventory);
+                    successMessage = "Inventory created successfully.";
+                }
+                else
+                {
+                    // Update existing inventory
+                    await InventoryService.UpdateInventoryAsync(editingInventory);
+                    successMessage = "Inventory updated successfully.";
+                }
+
+                await LoadInventories();
+                CloseInventoryModal();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+            {
+                inventoryErrorMessage = ex.Message + " Please refresh the page and try again.";
+            }
+            catch (Exception ex)
+            {
+                inventoryErrorMessage = $"Error saving inventory: {ex.Message}";
+            }
+        }
+    }
+
+    private void CloseInventoryModal()
+    {
+        showInventoryModal = false;
+        editingInventory = null;
+        inventoryErrorMessage = null;
+    }
+
+    private void DeleteInventory(Guid inventoryId)
+    {
+        inventoryToDelete = inventoryId;
+        showDeleteModal = true;
+    }
+
+    private async Task ConfirmDeleteInventory()
+    {
+        try
+        {
+            var result = await InventoryService.DeleteInventoryAsync(inventoryToDelete, currentUserId);
+            if (result)
+            {
+                await LoadInventories();
+                successMessage = "Inventory deleted successfully.";
+            }
+            else
+            {
+                errorMessage = "You don't have permission to delete this inventory.";
+            }
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            errorMessage = ex.Message + " Please refresh the page and try again.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting inventory: {ex.Message}";
+        }
+        CloseDeleteModal();
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        inventoryToDelete = Guid.Empty;
+    }
+
+    private void ViewInventory(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/items");
+    }
+
+    private void ConfigureInventory(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/settings");
+    }
+}

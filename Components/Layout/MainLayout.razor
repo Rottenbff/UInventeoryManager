@@ -1,0 +1,47 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<div class="app-container">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <div class="main-content">
+        <header class="top-bar">
+            <SearchBox />
+            <div class="top-bar-actions">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank" class="help-link">
+                    <i class="fas fa-question-circle"></i> Help
+                </a>
+                <!-- Temporarily removed ThemeToggle for testing -->
+                <!-- <ThemeToggle /> -->
+                <LanguageSelector />
+                <LoginDisplay />
+            </div>
+        </header>
+
+        <main class="content-area">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui">
+    <div class="error-banner">
+        <h4>An unhandled error has occurred.</h4>
+        <button class="btn-primary" @onclick="Reload">Reload</button>
+        <button class="btn-secondary" @onclick="Dismiss">Dismiss</button>
+    </div>
+</div>
+
+@code {
+    private void Reload()
+    {
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+
+    private void Dismiss()
+    {
+        // This would normally hide the error UI
+    }
+}

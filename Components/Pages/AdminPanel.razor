@@ -1,0 +1,529 @@
+@page "/admin"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using InventoryManager.Services
+@using InventoryManager.Models
+@using System.Security.Claims
+@attribute [Authorize(Policy = "Admin")]
+@inject IAdminAccessService AdminAccessService
+@inject IUserService UserService
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+@implements IDisposable
+
+<PageTitle>Admin Panel</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h3>Admin Panel</h3>
+                    <p class="text-sm">Manage admin access links and system settings</p>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">Generate Admin Access Link</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">Generate a one-time admin access link. When a signed-in user visits this link, they will be granted admin access indefinitely.</p>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Current User</label>
+                                        <input type="text" class="form-control" value="@currentUserEmail" readonly />
+                                    </div>
+
+                                    <button class="btn btn-primary w-100" @onclick="GenerateLink" disabled="@isGenerating">
+                                        @if (isGenerating)
+                                        {
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                            <span> Generating...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Generate Admin Link</span>
+                                        }
+                                    </button>
+
+                                    @if (!string.IsNullOrEmpty(generatedLink))
+                                    {
+                                        <div class="alert alert-success mt-3">
+                                            <h6>Link Generated Successfully!</h6>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="adminLink" value="@generatedLink" readonly />
+                                                <button class="btn btn-outline-secondary" @onclick="CopyLink">
+                                                    <i class="fas fa-copy"></i> Copy
+                                                </button>
+                                            </div>
+                                            <small class="text-muted">This link can be used once. Share it with the user who needs admin access.</small>
+                                        </div>
+                                    }
+
+                                    @if (!string.IsNullOrEmpty(errorMessage))
+                                    {
+                                        <div class="alert alert-danger mt-3">
+                                            @errorMessage
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Recent Admin Links</h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (isLoading)
+                                    {
+                                        <div class="text-center">
+                                            <div class="spinner-border" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (adminLinks.Any())
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Generated</th>
+                                                        <th>Status</th>
+                                                        <th>Used By</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var link in adminLinks)
+                                                    {
+                                                        <tr>
+                                                            <td>
+                                                                <small>@link.GeneratedAt.ToLocalTime().ToString("g")</small>
+                                                            </td>
+                                                            <td>
+                                                                @if (link.IsUsed)
+                                                                {
+                                                                    <span class="badge bg-success">Used</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="badge bg-warning">Pending</span>
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                @if (link.IsUsed && !string.IsNullOrEmpty(link.UsedByEmail))
+                                                                {
+                                                                    <small>@link.UsedByEmail</small>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="text-muted">-</span>
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLink(link.Id)" disabled="@isDeleting">
+                                                                    Delete
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted text-center">No admin links generated yet.</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <h4>User Management</h4>
+                    <p class="text-sm">Manage users, permissions, and access</p>
+                </div>
+                <div class="card-body">
+                    <div class="toolbar mb-3 d-flex flex-wrap gap-2">
+                        <button class="btn btn-warning" @onclick="BlockSelectedUsers" disabled="@(selectedUserIds.Count == 0 || isProcessing)">
+                            <i class="fas fa-ban"></i> Block
+                        </button>
+                        <button class="btn btn-success" @onclick="UnblockSelectedUsers" disabled="@(selectedUserIds.Count == 0 || isProcessing)">
+                            <i class="fas fa-check-circle"></i> Unblock
+                        </button>
+                        <button class="btn btn-danger" @onclick="DeleteSelectedUsers" disabled="@(selectedUserIds.Count == 0 || isProcessing)">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                        <button class="btn btn-primary" @onclick="AddToAdmin" disabled="@(selectedUserIds.Count == 0 || isProcessing)">
+                            <i class="fas fa-user-shield"></i> Add to Admin
+                        </button>
+                        <button class="btn btn-secondary" @onclick="RemoveFromAdmin" disabled="@(selectedUserIds.Count == 0 || isProcessing)">
+                            <i class="fas fa-user"></i> Remove from Admin
+                        </button>
+                    </div>
+
+                    @if (isLoadingUsers)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (users != null && users.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Select</th>
+                                        <th>Email</th>
+                                        <th>Name</th>
+                                        <th>Provider</th>
+                                        <th>Is Admin</th>
+                                        <th>Is Blocked</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in users)
+                                    {
+                                        <tr class="@(user.Email == currentUserEmail ? "table-active" : "")">
+                                            <td>
+                                                <input type="checkbox" @onchange="@(args => OnCheckboxChanged(user.Id, args.Value))" />
+                                            </td>
+                                            <td>@user.Email @(user.Email == currentUserEmail ? "(You)" : "")</td>
+                                            <td>@user.Name</td>
+                                            <td>@user.Provider</td>
+                                            <td>
+                                                @if (user.IsAdmin)
+                                                {
+                                                    <span class="badge bg-primary">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">No</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.IsBlocked)
+                                                {
+                                                    <span class="badge bg-danger">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">No</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center">No users found.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string currentUserEmail = string.Empty;
+    private string generatedLink = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isGenerating = false;
+    private bool isLoading = true;
+    private bool isDeleting = false;
+    private List<AdminAccess> adminLinks = new List<AdminAccess>();
+    private List<User> users = new List<User>();
+    private bool isLoadingUsers = true;
+    private bool isProcessing = false;
+    private HashSet<Guid> selectedUserIds = new HashSet<Guid>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUser();
+        await LoadAdminLinks();
+        await LoadUsers();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserEmail = authState.User?.Identity?.Name ?? "Unknown";
+    }
+
+    private async Task LoadAdminLinks()
+    {
+        isLoading = true;
+        try
+        {
+            adminLinks = await AdminAccessService.GetAllLinksAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading admin links: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task GenerateLink()
+    {
+        isGenerating = true;
+        errorMessage = string.Empty;
+        generatedLink = string.Empty;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userEmail = authState.User.FindFirstValue(ClaimTypes.Email);
+
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(userEmail))
+            {
+                errorMessage = "Unable to identify current user.";
+                return;
+            }
+
+            var adminAccess = await AdminAccessService.GenerateAdminLinkAsync(userId, userEmail);
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            generatedLink = $"{baseUrl}/admin-access/{adminAccess.GeneratedLink}";
+
+            await LoadAdminLinks();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error generating link: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task CopyLink()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", generatedLink);
+    }
+
+    private async Task DeleteLink(Guid id)
+    {
+        isDeleting = true;
+        try
+        {
+            await AdminAccessService.DeleteLinkAsync(id);
+            await LoadAdminLinks();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting link: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoadingUsers = true;
+        try
+        {
+            users = await UserService.GetAllUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading users: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingUsers = false;
+        }
+    }
+
+    private void OnCheckboxChanged(Guid userId, object? value)
+    {
+        if (value is bool isChecked)
+        {
+            if (isChecked)
+            {
+                selectedUserIds.Add(userId);
+            }
+            else
+            {
+                selectedUserIds.Remove(userId);
+            }
+        }
+    }
+
+    private async Task BlockSelectedUsers()
+    {
+        if (selectedUserIds.Any())
+        {
+            isProcessing = true;
+            try
+            {
+                var usersToBlock = selectedUserIds.ToList();
+                await UserService.BlockUsersAsync(usersToBlock);
+                selectedUserIds.Clear();
+
+                // Force UI update by clearing and reloading
+                users = new List<User>();
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(100);  // Brief pause for visual feedback
+                await LoadUsers();
+                await InvokeAsync(() => StateHasChanged());
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error blocking users: {ex.Message}";
+            }
+            finally
+            {
+                isProcessing = false;
+            }
+        }
+    }
+
+    private async Task UnblockSelectedUsers()
+    {
+        if (selectedUserIds.Any())
+        {
+            isProcessing = true;
+            try
+            {
+                var usersToUnblock = selectedUserIds.ToList();
+                await UserService.UnblockUsersAsync(usersToUnblock);
+                selectedUserIds.Clear();
+
+                // Force UI update by clearing and reloading
+                users = new List<User>();
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(100);  // Brief pause for visual feedback
+                await LoadUsers();
+                await InvokeAsync(() => StateHasChanged());
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error unblocking users: {ex.Message}";
+            }
+            finally
+            {
+                isProcessing = false;
+            }
+        }
+    }
+
+    private async Task DeleteSelectedUsers()
+    {
+        if (selectedUserIds.Any())
+        {
+            isProcessing = true;
+            try
+            {
+                var usersToDelete = selectedUserIds.ToList();
+                await UserService.DeleteUsersAsync(usersToDelete);
+                selectedUserIds.Clear();
+
+                // Force UI update by clearing and reloading
+                users = new List<User>();
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(100);  // Brief pause for visual feedback
+                await LoadUsers();
+                await InvokeAsync(() => StateHasChanged());
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error deleting users: {ex.Message}";
+            }
+            finally
+            {
+                isProcessing = false;
+            }
+        }
+    }
+
+    private async Task AddToAdmin()
+    {
+        if (selectedUserIds.Any())
+        {
+            isProcessing = true;
+            try
+            {
+                var usersToPromote = selectedUserIds.ToList();
+                await UserService.AddToAdminAsync(usersToPromote);
+                selectedUserIds.Clear();
+
+                // Force UI update by clearing and reloading
+                users = new List<User>();
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(100);  // Brief pause for visual feedback
+                await LoadUsers();
+                await InvokeAsync(() => StateHasChanged());
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error adding users to admin: {ex.Message}";
+            }
+            finally
+            {
+                isProcessing = false;
+            }
+        }
+    }
+
+    private async Task RemoveFromAdmin()
+    {
+        if (selectedUserIds.Any())
+        {
+            isProcessing = true;
+            try
+            {
+                var usersToDemote = selectedUserIds.ToList();
+                await UserService.RemoveFromAdminAsync(usersToDemote);
+                selectedUserIds.Clear();
+
+                // Force UI update by clearing and reloading
+                users = new List<User>();
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(100);  // Brief pause for visual feedback
+                await LoadUsers();
+                await InvokeAsync(() => StateHasChanged());
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error removing users from admin: {ex.Message}";
+            }
+            finally
+            {
+                isProcessing = false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
+    }
+}

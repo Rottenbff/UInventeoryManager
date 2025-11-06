@@ -1,0 +1,46 @@
+﻿﻿<div class="nav-header">
+    <div class="logo">
+        <i class="fas fa-boxes logo-icon"></i>
+        <span class="logo-text">Inventory Manager</span>
+    </div>
+</div>
+
+<nav class="nav-menu">
+    <ul class="nav-links">
+        <li class="nav-item">
+            <a class="nav-link" href="/">
+                <i class="fas fa-home nav-icon"></i>
+                <span>Dashboard</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/my-inventories">
+                <i class="fas fa-warehouse nav-icon"></i>
+                <span>My Inventories</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/search">
+                <i class="fas fa-search nav-icon"></i>
+                <span>Search</span>
+            </a>
+        </li>
+        <AuthorizeView Roles="Admin">
+            <li class="nav-item">
+                <a class="nav-link" href="/admin">
+                    <i class="fas fa-user-shield nav-icon"></i>
+                    <span>Admin Panel</span>
+                </a>
+            </li>
+        </AuthorizeView>
+    </ul>
+</nav>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

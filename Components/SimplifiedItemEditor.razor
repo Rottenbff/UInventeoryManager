@@ -1,0 +1,157 @@
+@using InventoryManager.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject ICloudinaryService CloudinaryService
+@rendermode InteractiveServer
+
+<div class="item-editor">
+    <div class="form-group">
+        <label for="customItemId" class="form-label">Custom Item ID</label>
+        <input type="text" class="form-control" id="customItemId" @bind="Item.CustomItemId" placeholder="Enter custom item ID" />
+    </div>
+
+    @if (Inventory != null)
+    {
+        <!-- String Fields -->
+        @if (Inventory.CustomString1Enabled && !string.IsNullOrEmpty(Inventory.CustomString1Name))
+        {
+            <div class="form-group">
+                <label for="customString1" class="form-label">@Inventory.CustomString1Name</label>
+                <input type="text" class="form-control" id="customString1" @bind="Item.CustomString1Value" placeholder="Enter @Inventory.CustomString1Name" />
+            </div>
+        }
+
+        @if (Inventory.CustomString2Enabled && !string.IsNullOrEmpty(Inventory.CustomString2Name))
+        {
+            <div class="form-group">
+                <label for="customString2" class="form-label">@Inventory.CustomString2Name</label>
+                <input type="text" class="form-control" id="customString2" @bind="Item.CustomString2Value" placeholder="Enter @Inventory.CustomString2Name" />
+            </div>
+        }
+
+        @if (Inventory.CustomString3Enabled && !string.IsNullOrEmpty(Inventory.CustomString3Name))
+        {
+            <div class="form-group">
+                <label for="customString3" class="form-label">@Inventory.CustomString3Name</label>
+                <input type="text" class="form-control" id="customString3" @bind="Item.CustomString3Value" placeholder="Enter @Inventory.CustomString3Name" />
+            </div>
+        }
+
+        <!-- Integer Fields -->
+        @if (Inventory.CustomInt1Enabled && !string.IsNullOrEmpty(Inventory.CustomInt1Name))
+        {
+            <div class="form-group">
+                <label for="customInt1" class="form-label">@Inventory.CustomInt1Name</label>
+                <input type="number" class="form-control" id="customInt1" @bind="Item.CustomInt1Value" placeholder="Enter @Inventory.CustomInt1Name" />
+            </div>
+        }
+
+        @if (Inventory.CustomInt2Enabled && !string.IsNullOrEmpty(Inventory.CustomInt2Name))
+        {
+            <div class="form-group">
+                <label for="customInt2" class="form-label">@Inventory.CustomInt2Name</label>
+                <input type="number" class="form-control" id="customInt2" @bind="Item.CustomInt2Value" placeholder="Enter @Inventory.CustomInt2Name" />
+            </div>
+        }
+
+        @if (Inventory.CustomInt3Enabled && !string.IsNullOrEmpty(Inventory.CustomInt3Name))
+        {
+            <div class="form-group">
+                <label for="customInt3" class="form-label">@Inventory.CustomInt3Name</label>
+                <input type="number" class="form-control" id="customInt3" @bind="Item.CustomInt3Value" placeholder="Enter @Inventory.CustomInt3Name" />
+            </div>
+        }
+
+        <!-- Boolean Fields -->
+        @if (Inventory.CustomBool1Enabled && !string.IsNullOrEmpty(Inventory.CustomBool1Name))
+        {
+            <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="customBool1" @bind="Item.CustomBool1Value" />
+                    <label class="form-check-label" for="customBool1">@Inventory.CustomBool1Name</label>
+                </div>
+            </div>
+        }
+
+        @if (Inventory.CustomBool2Enabled && !string.IsNullOrEmpty(Inventory.CustomBool2Name))
+        {
+            <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="customBool2" @bind="Item.CustomBool2Value" />
+                    <label class="form-check-label" for="customBool2">@Inventory.CustomBool2Name</label>
+                </div>
+            </div>
+        }
+
+        @if (Inventory.CustomBool3Enabled && !string.IsNullOrEmpty(Inventory.CustomBool3Name))
+        {
+            <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="customBool3" @bind="Item.CustomBool3Value" />
+                    <label class="form-check-label" for="customBool3">@Inventory.CustomBool3Name</label>
+                </div>
+            </div>
+        }
+
+        <!-- Image Upload -->
+        <div class="form-group">
+            <label for="itemImage" class="form-label">Item Image</label>
+            <InputFile OnChange="OnImageSelected" class="form-control" id="itemImage" accept="image/*" />
+            @if (!string.IsNullOrEmpty(Item.ImageUrl))
+            {
+                <div class="mt-2">
+                    <img src="@Item.ImageUrl" class="img-thumbnail" alt="Item Image" style="max-height: 150px;">
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(imageUploadStatus))
+            {
+                <div class="mt-2">
+                    <span class="text-info">@imageUploadStatus</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Item Item { get; set; } = default!;
+    [Parameter] public Inventory Inventory { get; set; } = default!;
+    [Parameter] public EventCallback<Item> ItemChanged { get; set; }
+
+    private string imageUploadStatus = "";
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        imageUploadStatus = "Uploading...";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            // Get the first file from the selected files
+            var imageFile = e.File;
+            if (imageFile != null)
+            {
+                // Upload to Cloudinary
+                var imageUrl = await CloudinaryService.UploadImageAsync(imageFile);
+                if (!string.IsNullOrEmpty(imageUrl))
+                {
+                    Item.ImageUrl = imageUrl;
+                    await ItemChanged.InvokeAsync(Item);
+                    imageUploadStatus = "Image uploaded successfully!";
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    imageUploadStatus = "Error uploading image - no URL returned.";
+                }
+            }
+            else
+            {
+                imageUploadStatus = "No file selected.";
+            }
+        }
+        catch (Exception ex)
+        {
+            imageUploadStatus = $"Error uploading image: {ex.Message}";
+        }
+    }
+}

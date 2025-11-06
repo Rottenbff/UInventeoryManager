@@ -1,0 +1,95 @@
+@page "/login"
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1 class="page-title">Login</h1>
+    <p class="page-subtitle">Sign in with your preferred authentication provider</p>
+</div>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">
+        <strong>Success:</strong> @successMessage
+        <button class="btn-close" @onclick="ClearSuccess">&times;</button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        <strong>Authentication Error:</strong> @errorMessage
+        <button class="btn-close" @onclick="ClearError">&times;</button>
+    </div>
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="mb-4">Welcome to Inventory Manager</h3>
+                <p class="text-muted mb-4">Please sign in with one of the following providers:</p>
+
+                <div class="d-grid gap-3">
+                    <a href="/api/auth/login?provider=Google&returnUrl=/" class="btn btn-danger btn-lg" target="_self">
+                        <i class="fab fa-google me-2"></i> Sign in with Google
+                    </a>
+
+                    <a href="/api/auth/login?provider=Facebook&returnUrl=/" class="btn btn-primary btn-lg" target="_self">
+                        <i class="fab fa-facebook-f me-2"></i> Sign in with Facebook
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override void OnInitialized()
+    {
+        // Check for error in query string
+        var uri = new Uri(Navigation.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        var error = queryParams["error"];
+        if (!string.IsNullOrEmpty(error))
+        {
+            errorMessage = Uri.UnescapeDataString(error);
+        }
+
+        var message = queryParams["message"];
+        if (!string.IsNullOrEmpty(message))
+        {
+            successMessage = Uri.UnescapeDataString(message);
+        }
+    }
+
+    private void ClearError()
+    {
+        errorMessage = null;
+    }
+
+    private void ClearSuccess()
+    {
+        successMessage = null;
+    }
+
+    private async Task LoginWithGoogle()
+    {
+        var returnUrl = "/";
+        var url = $"/api/auth/login?provider=Google&returnUrl={returnUrl}";
+        Console.WriteLine($"Navigating to: {url}");
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private async Task LoginWithFacebook()
+    {
+        var returnUrl = "/";
+        var url = $"/api/auth/login?provider=Facebook&returnUrl={returnUrl}";
+        Console.WriteLine($"Navigating to: {url}");
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+}

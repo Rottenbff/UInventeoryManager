@@ -1,0 +1,73 @@
+@page "/make-admin"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject InventoryManager.Data.ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using Microsoft.EntityFrameworkCore
+@using InventoryManager.Models
+@rendermode InteractiveServer
+
+<PageTitle>Make Admin</PageTitle>
+
+<div class="container">
+    <h1>Make Current User Admin</h1>
+    
+    @if (user != null)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Current User</h5>
+                <p class="card-text">
+                    <strong>Email:</strong> @user.Email<br>
+                    <strong>Name:</strong> @user.Name<br>
+                    <strong>Is Admin:</strong> @(user.IsAdmin ? "Yes" : "No")<br>
+                    <strong>Is Blocked:</strong> @(user.IsBlocked ? "Yes" : "No")
+                </p>
+                
+                @if (!user.IsAdmin)
+                {
+                    <button class="btn btn-primary" @onclick="SetAsAdmin">Make Admin</button>
+                }
+                else
+                {
+                    <div class="alert alert-success">This user is already an admin!</div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">User not found in database.</div>
+    }
+    
+    @if (message != null)
+    {
+        <div class="alert alert-info mt-3">@message</div>
+    }
+</div>
+
+@code {
+    private User? user;
+    private string? message;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var email = authState.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+        
+        if (!string.IsNullOrEmpty(email))
+        {
+            user = await DbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
+        }
+    }
+    
+    private async Task SetAsAdmin()
+    {
+        if (user != null)
+        {
+            user.IsAdmin = true;
+            await DbContext.SaveChangesAsync();
+            message = "User has been made an admin!";
+            StateHasChanged();
+        }
+    }
+}

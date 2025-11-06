@@ -1,0 +1,485 @@
+@using InventoryManager.Models
+@inject ICustomIdGeneratorService CustomIdGeneratorService
+@inject IInventoryService InventoryService
+@rendermode InteractiveServer
+
+<div>
+    <h3 class="section-title">ID Format Builder</h3>
+    <p class="text-muted">Configure your custom ID format using the available components.</p>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Tip:</strong> Configure the components below to build your custom ID format.
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Format Configuration</h4>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="idFormatEnabled" @bind="Inventory.IdFormatEnabled">
+                    <label class="form-check-label" for="idFormatEnabled">Enable Custom ID Format</label>
+                </div>
+            </div>
+
+            @if (Inventory.IdFormatEnabled)
+            {
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p class="text-muted">Drag-and-drop functionality will be available in a future update. For now, configure your format manually.</p>
+
+                        <div class="mt-3">
+                            <div class="d-flex gap-2 mb-3">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="AddDefaultFormat">
+                                    <i class="fas fa-magic"></i> Add Default Format (ITEM-DATE-RANDOM)
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFormat">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+
+                        @foreach (var component in FormatComponents)
+                        {
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex align-items-center">
+                                            @switch (component.Type)
+                                            {
+                                                case "FixedText":
+                                                    <i class="fas fa-font me-2"></i>
+                                                    <strong>Fixed Text</strong>
+                                                    break;
+                                                case "RandomNumber":
+                                                    <i class="fas fa-dice me-2"></i>
+                                                    <strong>Random Number</strong>
+                                                    break;
+                                                case "SequenceNumber":
+                                                    <i class="fas fa-list-ol me-2"></i>
+                                                    <strong>Sequence Number</strong>
+                                                    break;
+                                                case "Date":
+                                                    <i class="fas fa-calendar me-2"></i>
+                                                    <strong>Date</strong>
+                                                    break;
+                                                case "Guid":
+                                                    <i class="fas fa-hashtag me-2"></i>
+                                                    <strong>GUID</strong>
+                                                    break;
+                                            }
+                                        </div>
+                                        <div>
+                                            @if (FormatComponents.Count > 1)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => MoveComponentUp(component)" disabled="@(FormatComponents.First() == component)">
+                                                    <i class="fas fa-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => MoveComponentDown(component)" disabled="@(FormatComponents.Last() == component)">
+                                                    <i class="fas fa-arrow-down"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveComponent(component.Type)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    @if (component.Type == "FixedText")
+                                    {
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Text Value</label>
+                                                <input type="text" class="form-control"
+                                                       @bind="component.TextValue"
+                                                       placeholder="Enter text">
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (component.Type == "RandomNumber")
+                                    {
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Min Value</label>
+                                                <input type="number" class="form-control"
+                                                       @bind="component.MinValue"
+                                                       placeholder="0">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Max Value</label>
+                                                <input type="number" class="form-control"
+                                                       @bind="component.MaxValue"
+                                                       placeholder="9999">
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (component.Type == "SequenceNumber")
+                                    {
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Start Value</label>
+                                                <input type="number" class="form-control"
+                                                       @bind="component.StartValue"
+                                                       placeholder="1">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Increment</label>
+                                                <input type="number" class="form-control"
+                                                       @bind="component.IncrementValue"
+                                                       placeholder="1">
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (component.Type == "Date")
+                                    {
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Format</label>
+                                                <select class="form-select" @bind="component.DateFormat">
+                                                    <option value="yyyyMMdd">yyyyMMdd (20240101)</option>
+                                                    <option value="yyyy-MM-dd">yyyy-MM-dd (2024-01-01)</option>
+                                                    <option value="yyyyMd">yyyyMd (20241)</option>
+                                                    <option value="yyMMdd">yyMMdd (240101)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mt-3">
+                            <label class="form-label">Add Component</label>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" @bind="selectedComponentType">
+                                    <option value="">Select a component type...</option>
+                                    <option value="FixedText">Fixed Text</option>
+                                    <option value="RandomNumber">Random Number</option>
+                                    <option value="SequenceNumber">Sequence Number</option>
+                                    <option value="Date">Date</option>
+                                    <option value="Guid">GUID</option>
+                                </select>
+                                <button class="btn btn-primary" @onclick="AddComponent">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5>Preview</h5>
+                        <div class="bg-light p-3 rounded">
+                            <p class="mb-1"><strong>Format:</strong> @GetFormatString()</p>
+                            <p class="mb-0"><strong>Preview:</strong> <span class="badge bg-success fs-6">@previewId</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex">
+                    <button class="btn btn-primary me-2" @onclick="SaveIdFormat" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-2"></i>
+                        }
+                        @(isSaving ? "Saving..." : "Save ID Format")
+                    </button>
+                    <button class="btn btn-secondary" @onclick="UpdatePreview" disabled="@isSaving">
+                        <i class="fas fa-sync me-2"></i> Refresh Preview
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-secondary">
+                    <p class="mb-0">Custom ID format is disabled. Enable it to start building your custom ID format.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Inventory Inventory { get; set; } = default!;
+
+    private string previewId = "PREVIEW";
+    private string selectedComponentType = "";
+    private List<IdFormatComponent> FormatComponents { get; set; } = new();
+    private bool isSaving = false;
+
+    protected override void OnInitialized()
+    {
+        if (Inventory != null)
+        {
+            LoadFormatComponents();
+            UpdatePreview();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Reload components when inventory parameter changes
+        if (Inventory != null)
+        {
+            LoadFormatComponents();
+            UpdatePreview();
+        }
+    }
+
+    private void LoadFormatComponents()
+    {
+        FormatComponents = new List<IdFormatComponent>();
+
+        // Check if inventory has saved format components
+        if (Inventory.IdFormatEnabled && !string.IsNullOrEmpty(Inventory.IdFormatComponents))
+        {
+            var componentTypes = Inventory.IdFormatComponents.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var componentType in componentTypes)
+            {
+                var component = new IdFormatComponent { Type = componentType };
+                SetDefaultSettings(component);
+                FormatComponents.Add(component);
+            }
+        }
+        else
+        {
+            // No saved format, start with default
+            AddDefaultFormat();
+        }
+    }
+
+    private void SetDefaultSettings(IdFormatComponent component)
+    {
+        switch (component.Type)
+        {
+            case "FixedText":
+                component.TextValue = "ITEM";
+                break;
+            case "RandomNumber":
+                component.MinValue = "0";
+                component.MaxValue = "9999";
+                break;
+            case "SequenceNumber":
+                component.StartValue = "1";
+                component.IncrementValue = "1";
+                break;
+            case "Date":
+                component.DateFormat = "yyyyMMdd";
+                break;
+        }
+    }
+
+    private string GetComponentDisplayName(string type)
+    {
+        return type switch
+        {
+            "FixedText" => "Fixed Text",
+            "RandomNumber" => "Random Number",
+            "SequenceNumber" => "Sequence Number",
+            "Date" => "Date",
+            "Guid" => "GUID",
+            _ => type
+        };
+    }
+
+    private void AddComponent()
+    {
+        if (string.IsNullOrEmpty(selectedComponentType))
+            return;
+
+        var component = new IdFormatComponent { Type = selectedComponentType };
+        SetDefaultSettings(component);
+        FormatComponents.Add(component);
+        selectedComponentType = "";
+        UpdatePreview();
+    }
+
+    private void MoveComponentUp(IdFormatComponent component)
+    {
+        var index = FormatComponents.IndexOf(component);
+        if (index > 0)
+        {
+            var temp = FormatComponents[index - 1];
+            FormatComponents[index - 1] = FormatComponents[index];
+            FormatComponents[index] = temp;
+            UpdatePreview();
+        }
+    }
+
+    private void MoveComponentDown(IdFormatComponent component)
+    {
+        var index = FormatComponents.IndexOf(component);
+        if (index < FormatComponents.Count - 1)
+        {
+            var temp = FormatComponents[index + 1];
+            FormatComponents[index + 1] = FormatComponents[index];
+            FormatComponents[index] = temp;
+            UpdatePreview();
+        }
+    }
+
+    private void RemoveComponent(string componentType)
+    {
+        FormatComponents.RemoveAll(c => c.Type == componentType);
+        UpdatePreview();
+    }
+
+    private void AddDefaultFormat()
+    {
+        FormatComponents = new List<IdFormatComponent>
+        {
+            new IdFormatComponent { Type = "FixedText" },
+            new IdFormatComponent { Type = "Date" },
+            new IdFormatComponent { Type = "RandomNumber" }
+        };
+
+        foreach (var component in FormatComponents)
+        {
+            SetDefaultSettings(component);
+        }
+
+        UpdatePreview();
+    }
+
+    private void ClearFormat()
+    {
+        FormatComponents = new List<IdFormatComponent>();
+        UpdatePreview();
+    }
+
+    private string GetFormatString()
+    {
+        if (!FormatComponents.Any())
+            return "No components";
+
+        var parts = FormatComponents.Select(c =>
+        {
+            return c.Type switch
+            {
+                "FixedText" => $"TEXT({c.TextValue})",
+                "RandomNumber" => $"RND({c.MinValue}-{c.MaxValue})",
+                "SequenceNumber" => $"SEQ({c.StartValue},{c.IncrementValue})",
+                "Date" => $"DATE({c.DateFormat})",
+                "Guid" => "GUID",
+                _ => c.Type
+            };
+        });
+
+        return string.Join(" + ", parts);
+    }
+
+    private void UpdatePreview()
+    {
+        try
+        {
+            if (!FormatComponents.Any())
+            {
+                previewId = "NO FORMAT";
+                return;
+            }
+
+            var formatParts = new List<string>();
+
+            foreach (var component in FormatComponents)
+            {
+                switch (component.Type)
+                {
+                    case "FixedText":
+                        formatParts.Add(component.TextValue);
+                        break;
+
+                    case "RandomNumber":
+                        if (int.TryParse(component.MinValue, out int min) &&
+                            int.TryParse(component.MaxValue, out int max))
+                        {
+                            var random = new Random();
+                            formatParts.Add(random.Next(min, max + 1).ToString());
+                        }
+                        break;
+
+                    case "SequenceNumber":
+                        formatParts.Add("####");
+                        break;
+
+                    case "Date":
+                        formatParts.Add(DateTime.Now.ToString(component.DateFormat));
+                        break;
+
+                    case "Guid":
+                        formatParts.Add(Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper());
+                        break;
+                }
+            }
+
+            previewId = string.Join("-", formatParts);
+        }
+        catch (Exception ex)
+        {
+            previewId = $"Error: {ex.Message}";
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SaveIdFormat()
+    {
+        if (isSaving) return; // Prevent multiple saves
+
+        try
+        {
+            isSaving = true;
+            await InvokeAsync(StateHasChanged);
+
+            // Update the inventory properties
+            Inventory.IdFormatEnabled = true;
+            Inventory.IdFormatComponents = string.Join(",", FormatComponents.Select(c => c.Type));
+
+            // Actually save to the database
+            await InventoryService.UpdateInventoryAsync(Inventory);
+
+            // Show success message briefly
+            previewId = "ID format saved successfully!";
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(1500);
+            UpdatePreview();
+        }
+        catch (Exception ex)
+        {
+            previewId = $"Error saving format: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            isSaving = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        // Clean up any resources if needed in the future
+    }
+
+    public class IdFormatComponent
+    {
+        public string Type { get; set; } = "";
+
+        // Fixed Text
+        public string TextValue { get; set; } = "";
+
+        // Random Number
+        public string MinValue { get; set; } = "0";
+        public string MaxValue { get; set; } = "9999";
+
+        // Sequence Number
+        public string StartValue { get; set; } = "1";
+        public string IncrementValue { get; set; } = "1";
+
+        // Date
+        public string DateFormat { get; set; } = "yyyyMMdd";
+    }
+}

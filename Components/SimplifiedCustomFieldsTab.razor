@@ -1,0 +1,396 @@
+@using InventoryManager.Models
+@inject IDragDropInteropService DragDropService
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<div>
+    <h3 class="section-title">Custom Fields</h3>
+    <p class="text-muted">Configure the fixed custom fields for your inventory items. Drag and drop to reorder fields.</p>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Tip:</strong> Drag the <i class="fas fa-grip-vertical"></i> handle to reorder fields. The display order determines how fields appear in the item table.
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h4>String Fields</h4>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <ul @ref="stringFieldsList" id="custom-fields-list-string" class="custom-fields-list">
+                        <li class="list-group-item draggable-item" data-field="string1">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">String Field 1</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="string1Enabled" @bind="Inventory.CustomString1Enabled">
+                                        <label class="form-check-label" for="string1Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomString1Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="string1Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="string1Name" @bind="Inventory.CustomString1Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="string1Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="string1Order" @bind="Inventory.CustomString1Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="string2">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">String Field 2</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="string2Enabled" @bind="Inventory.CustomString2Enabled">
+                                        <label class="form-check-label" for="string2Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomString2Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="string2Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="string2Name" @bind="Inventory.CustomString2Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="string2Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="string2Order" @bind="Inventory.CustomString2Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="string3">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">String Field 3</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="string3Enabled" @bind="Inventory.CustomString3Enabled">
+                                        <label class="form-check-label" for="string3Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomString3Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="string3Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="string3Name" @bind="Inventory.CustomString3Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="string3Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="string3Order" @bind="Inventory.CustomString3Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <h4>Integer Fields</h4>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <ul @ref="intFieldsList" id="custom-fields-list-int" class="custom-fields-list">
+                        <li class="list-group-item draggable-item" data-field="int1">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Integer Field 1</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="int1Enabled" @bind="Inventory.CustomInt1Enabled">
+                                        <label class="form-check-label" for="int1Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomInt1Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="int1Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="int1Name" @bind="Inventory.CustomInt1Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="int1Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="int1Order" @bind="Inventory.CustomInt1Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="int2">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Integer Field 2</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="int2Enabled" @bind="Inventory.CustomInt2Enabled">
+                                        <label class="form-check-label" for="int2Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomInt2Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="int2Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="int2Name" @bind="Inventory.CustomInt2Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="int2Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="int2Order" @bind="Inventory.CustomInt2Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="int3">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Integer Field 3</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="int3Enabled" @bind="Inventory.CustomInt3Enabled">
+                                        <label class="form-check-label" for="int3Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomInt3Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="int3Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="int3Name" @bind="Inventory.CustomInt3Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="int3Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="int3Order" @bind="Inventory.CustomInt3Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <h4>Boolean Fields</h4>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <ul @ref="boolFieldsList" id="custom-fields-list-bool" class="custom-fields-list">
+                        <li class="list-group-item draggable-item" data-field="bool1">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Boolean Field 1</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="bool1Enabled" @bind="Inventory.CustomBool1Enabled">
+                                        <label class="form-check-label" for="bool1Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomBool1Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="bool1Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="bool1Name" @bind="Inventory.CustomBool1Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bool1Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="bool1Order" @bind="Inventory.CustomBool1Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="bool2">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Boolean Field 2</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="bool2Enabled" @bind="Inventory.CustomBool2Enabled">
+                                        <label class="form-check-label" for="bool2Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomBool2Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="bool2Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="bool2Name" @bind="Inventory.CustomBool2Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bool2Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="bool2Order" @bind="Inventory.CustomBool2Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+
+                        <li class="list-group-item draggable-item" data-field="bool3">
+                            <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                            <div class="field-content" style="flex: 1;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Boolean Field 3</h5>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="bool3Enabled" @bind="Inventory.CustomBool3Enabled">
+                                        <label class="form-check-label" for="bool3Enabled">Enabled</label>
+                                    </div>
+                                </div>
+                                @if (Inventory.CustomBool3Enabled)
+                                {
+                                    <div class="form-group">
+                                        <label for="bool3Name" class="form-label">Field Name</label>
+                                        <input type="text" class="form-control" id="bool3Name" @bind="Inventory.CustomBool3Name" placeholder="Enter field name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bool3Order" class="form-label">Display Order</label>
+                                        <input type="number" class="form-control" id="bool3Order" @bind="Inventory.CustomBool3Order" min="0">
+                                    </div>
+                                }
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Inventory Inventory { get; set; } = default!;
+    [Parameter] public EventCallback<Inventory> InventoryChanged { get; set; }
+
+    private ElementReference stringFieldsList;
+    private ElementReference intFieldsList;
+    private ElementReference boolFieldsList;
+    private DotNetObjectReference<SimplifiedCustomFieldsTab>? dotNetReference;
+    private bool isInitialized = false;
+
+    protected override void OnInitialized()
+    {
+        // Initialize with a slight delay to ensure DOM is ready
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(100);
+            await InitializeDragAndDrop();
+        });
+    }
+
+    private async Task InitializeDragAndDrop()
+    {
+        if (isInitialized) return;
+
+        try
+        {
+            dotNetReference = DotNetObjectReference.Create(this);
+
+            // Initialize drag-and-drop for each category
+            await DragDropService.InitializeSortable("custom-fields-list-string", dotNetReference, nameof(OnStringFieldsReordered));
+            await Task.Delay(50);
+            await DragDropService.InitializeSortable("custom-fields-list-int", dotNetReference, nameof(OnIntFieldsReordered));
+            await Task.Delay(50);
+            await DragDropService.InitializeSortable("custom-fields-list-bool", dotNetReference, nameof(OnBoolFieldsReordered));
+
+            isInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            // Error initializing drag-and-drop
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnStringFieldsReordered(string[] orderedFields)
+    {
+        // Update the order values based on the new order
+        for (int i = 0; i < orderedFields.Length; i++)
+        {
+            var field = orderedFields[i];
+            switch (field)
+            {
+                case "string1":
+                    Inventory.CustomString1Order = i;
+                    break;
+                case "string2":
+                    Inventory.CustomString2Order = i;
+                    break;
+                case "string3":
+                    Inventory.CustomString3Order = i;
+                    break;
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnIntFieldsReordered(string[] orderedFields)
+    {
+        // Update the order values based on the new order
+        for (int i = 0; i < orderedFields.Length; i++)
+        {
+            var field = orderedFields[i];
+            switch (field)
+            {
+                case "int1":
+                    Inventory.CustomInt1Order = i;
+                    break;
+                case "int2":
+                    Inventory.CustomInt2Order = i;
+                    break;
+                case "int3":
+                    Inventory.CustomInt3Order = i;
+                    break;
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnBoolFieldsReordered(string[] orderedFields)
+    {
+        // Update the order values based on the new order
+        for (int i = 0; i < orderedFields.Length; i++)
+        {
+            var field = orderedFields[i];
+            switch (field)
+            {
+                case "bool1":
+                    Inventory.CustomBool1Order = i;
+                    break;
+                case "bool2":
+                    Inventory.CustomBool2Order = i;
+                    break;
+                case "bool3":
+                    Inventory.CustomBool3Order = i;
+                    break;
+            }
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnInventoryChanged()
+    {
+        await InventoryChanged.InvokeAsync(Inventory);
+    }
+
+    public void Dispose()
+    {
+        dotNetReference?.Dispose();
+
+        // Clean up SortableJS instances
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await DragDropService.DestroySortable("custom-fields-list-string");
+                await DragDropService.DestroySortable("custom-fields-list-int");
+                await DragDropService.DestroySortable("custom-fields-list-bool");
+            }
+            catch (Exception ex)
+            {
+                // Error destroying SortableJS instances
+            }
+        });
+    }
+}

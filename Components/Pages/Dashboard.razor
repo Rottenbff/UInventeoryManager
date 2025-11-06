@@ -1,0 +1,295 @@
+@page "/dashboard"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IInventoryService InventoryService
+@inject ICustomIdGeneratorService CustomIdGeneratorService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Inventory Manager Dashboard</h1>
+        <button class="btn btn-primary" @onclick="CreateNewInventory">Create New Inventory</button>
+    </div>
+
+    @if (inventories == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!inventories.Any())
+    {
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Welcome to Inventory Manager!</h5>
+                <p class="card-text">Get started by creating your first inventory.</p>
+                <button class="btn btn-primary" @onclick="CreateNewInventory">Create Your First Inventory</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Inventory Overview -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Your Inventories</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @foreach (var inventory in inventories.Take(3))
+                            {
+                                <div class="col-md-4 mb-3">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">@inventory.Title</h5>
+                                            <p class="card-text">@inventory.Description</p>
+                                            <p class="card-text"><small class="text-muted">Category: @inventory.Category</small></p>
+                                            <div class="d-flex justify-content-between">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewInventoryItems(inventory.Id)">
+                                                    <i class="bi bi-box"></i> Items
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ConfigureInventory(inventory.Id)">
+                                                    <i class="bi bi-gear"></i> Settings
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        @if (inventories.Count > 3)
+                        {
+                            <div class="text-center">
+                                <a href="/my-inventories" class="btn btn-outline-primary">View All Inventories</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Killer Features Showcase -->
+        <div class="row">
+            <!-- Custom Fields Section -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="bi bi-card-list"></i> Custom Fields
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Dynamic schema design using simplified fixed fields approach</p>
+                        <ul>
+                            <li>Predefined field slots (3 string, 3 number, 3 boolean)</li>
+                            <li>Enable/disable individual fields</li>
+                            <li>Customize field names</li>
+                            <li>Dynamic form rendering</li>
+                        </ul>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" @onclick="ShowCustomFieldsExample">
+                                <i class="bi bi-play-circle"></i> See Custom Fields in Action
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom IDs Section -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="bi bi-tag"></i> Custom IDs
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Configurable ID format builder with real-time preview</p>
+                        <ul>
+                            <li>Multiple part types (Text, Number, GUID, Date, Sequence)</li>
+                            <li>Automatic duplicate prevention</li>
+                            <li>Real-time ID preview</li>
+                        </ul>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-success" @onclick="ShowCustomIdsExample">
+                                <i class="bi bi-play-circle"></i> See Custom IDs in Action
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Details Modals -->
+        @if (showCustomFieldsModal)
+        {
+            <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Custom Fields Example</h5>
+                            <button type="button" class="btn-close" @onclick="CloseCustomFieldsModal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Configuration</h6>
+                                    <p>Go to any inventory's settings to configure custom fields:</p>
+                                    <ol>
+                                        <li>Navigate to an inventory</li>
+                                        <li>Click "Settings"</li>
+                                        <li>Select "Custom Fields" tab</li>
+                                        <li>Enable fields you want to use</li>
+                                        <li>Set custom names for fields</li>
+                                        <li>Adjust display order</li>
+                                    </ol>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Usage</h6>
+                                    <p>When adding items, custom fields appear automatically:</p>
+                                    <ul>
+                                        <li>Text fields for names/descriptions</li>
+                                        <li>Number fields for quantities/weights</li>
+                                        <li>Checkbox fields for boolean values</li>
+                                        <li>And more...</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-primary" @onclick="GoToMyInventories">Go to My Inventories</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (showCustomIdsModal)
+        {
+            <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Custom IDs Example</h5>
+                            <button type="button" class="btn-close" @onclick="CloseCustomIdsModal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>ID Format Builder</h6>
+                                    <p>Configure ID formats in inventory settings:</p>
+                                    <ol>
+                                        <li>Navigate to an inventory</li>
+                                        <li>Click "Settings"</li>
+                                        <li>Select "ID Format" tab</li>
+                                        <li>See real-time preview of generated IDs</li>
+                                    </ol>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>ID Generation</h6>
+                                    <p>When adding items, IDs are auto-generated:</p>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <p class="mb-1"><strong>Example Format:</strong> ITEM-[DATE]-[SEQUENCE]</p>
+                                            <p class="mb-1"><strong>Generated ID:</strong> ITEM-20251026-001</p>
+                                            <p class="mb-0"><strong>Next ID:</strong> ITEM-20251026-002</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-primary" @onclick="GoToMyInventories">Go to My Inventories</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Inventory> inventories = new();
+    private Guid currentUserId;
+    private bool showCustomFieldsModal = false;
+    private bool showCustomIdsModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+
+        await LoadInventories();
+    }
+
+    private async Task LoadInventories()
+    {
+        inventories = await InventoryService.GetInventoriesForUserAsync(currentUserId);
+        StateHasChanged();
+    }
+
+    private async Task CreateNewInventory()
+    {
+        var newInventory = new Inventory
+        {
+            Id = Guid.NewGuid(),
+            CreatorId = currentUserId,
+            Title = "My New Inventory",
+            Description = "Created on " + DateTime.Now.ToString("yyyy-MM-dd"),
+            Category = "General"
+        };
+
+        try
+        {
+            await InventoryService.CreateInventoryAsync(newInventory);
+            await LoadInventories();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error creating inventory: {ex.Message}");
+        }
+    }
+
+    private void ViewInventoryItems(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/items");
+    }
+
+    private void ConfigureInventory(Guid inventoryId)
+    {
+        Navigation.NavigateTo($"/inventory/{inventoryId}/settings");
+    }
+
+    private void ShowCustomFieldsExample()
+    {
+        showCustomFieldsModal = true;
+    }
+
+    private void CloseCustomFieldsModal()
+    {
+        showCustomFieldsModal = false;
+    }
+
+    private void ShowCustomIdsExample()
+    {
+        showCustomIdsModal = true;
+    }
+
+    private void CloseCustomIdsModal()
+    {
+        showCustomIdsModal = false;
+    }
+
+    private void GoToMyInventories()
+    {
+        Navigation.NavigateTo("/my-inventories");
+    }
+}

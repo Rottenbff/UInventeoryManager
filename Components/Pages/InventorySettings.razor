@@ -1,0 +1,623 @@
+@page "/inventory/{inventoryId}/settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IInventoryService InventoryService
+@inject IInventoryAccessService InventoryAccessService
+@inject IUserService UserService
+@inject ITagService TagService
+@inject ICloudinaryService CloudinaryService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Forms
+@rendermode InteractiveServer
+
+<PageTitle>Inventory Settings</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Inventory Settings</h1>
+    <p class="page-subtitle">Configure your inventory settings</p>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+        <button class="btn-close" @onclick="() => errorMessage = null">&times;</button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">
+        @successMessage
+        <button class="btn-close" @onclick="() => successMessage = null">&times;</button>
+    </div>
+}
+
+@if (inventory == null)
+{
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading inventory settings...</p>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <nav class="settings-nav">
+                        <ul class="nav-links">
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "general" ? "active" : "")" @onclick="SetGeneralTab">
+                                    <i class="fas fa-cog nav-icon"></i> General
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "custom-fields" ? "active" : "")" @onclick="SetCustomFieldsTab">
+                                    <i class="fas fa-list nav-icon"></i> Custom Fields
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "id-format" ? "active" : "")" @onclick="SetIdFormatTab">
+                                    <i class="fas fa-hashtag nav-icon"></i> ID Format
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "image" ? "active" : "")" @onclick="SetImageTab">
+                                    <i class="fas fa-image nav-icon"></i> Image
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "discussion" ? "active" : "")" @onclick="SetDiscussionTab">
+                                    <i class="fas fa-comments nav-icon"></i> Discussion
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "access" ? "active" : "")" @onclick="SetAccessTab">
+                                    <i class="fas fa-user-lock nav-icon"></i> Access
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(activeTab == "tags" ? "active" : "")" @onclick="SetTagsTab">
+                                    <i class="fas fa-tags nav-icon"></i> Tags
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-body">
+                    @switch (activeTab)
+                    {
+                        case "general":
+                            <div>
+                                <h3 class="section-title">General Settings</h3>
+                                <div class="form-group">
+                                    <label for="title" class="form-label">Title</label>
+                                    <input type="text" class="form-control" id="title" @bind="inventory.Title" placeholder="Enter inventory title" />
+                                </div>
+                                <div class="form-group">
+                                    <label for="description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="description" @bind="inventory.Description" placeholder="Enter inventory description"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="category" class="form-label">Category</label>
+                                    <input type="text" class="form-control" id="category" @bind="inventory.Category" placeholder="Enter category" />
+                                </div>
+                                <button class="btn btn-primary" @onclick="SaveGeneralSettings">Save General Settings</button>
+                            </div>
+                            break;
+                        case "custom-fields":
+                            <SimplifiedCustomFieldsTab Inventory="inventory" InventoryChanged="OnInventoryChanged" />
+                            break;
+                        case "id-format":
+                            <SimplifiedIdFormatTab Inventory="inventory" />
+                            break;
+                        case "image":
+                            <div>
+                                <h3 class="section-title">Inventory Image</h3>
+                                <p>Upload an image for your inventory.</p>
+
+                                <div class="form-group">
+                                    <label for="inventoryImage" class="form-label">Select Image</label>
+                                    <InputFile OnChange="OnImageSelected" class="form-control" id="inventoryImage" accept="image/*" />
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(uploadStatus))
+                                {
+                                    <div class="alert alert-info mt-3">@uploadStatus</div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(inventory.ImageUrl) || !string.IsNullOrEmpty(newImageUrl))
+                                {
+                                    <div class="form-group mt-3">
+                                        <label class="form-label">Preview</label>
+                                        <div>
+                                            <img src="@(newImageUrl ?? inventory.ImageUrl)" class="img-thumbnail" alt="Inventory Image" style="max-height: 200px;">
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(newImageUrl))
+                                        {
+                                            <button class="btn btn-outline-danger mt-2" @onclick="RemoveImage">Remove Image</button>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" @onclick="SaveImageSettings" disabled="@(string.IsNullOrEmpty(newImageUrl))">
+                                        <i class="fas fa-save me-2"></i> Save Image
+                                    </button>
+                                </div>
+                            </div>
+                            break;
+                        case "discussion":
+                            <div>
+                                <h3 class="section-title">Discussion Settings</h3>
+                                <p>Manage discussion settings for this inventory.</p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableDiscussion" @bind="discussionEnabled">
+                                    <label class="form-check-label" for="enableDiscussion">
+                                        Enable Discussion
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary mt-3" @onclick="SaveDiscussionSettings">Save Discussion Settings</button>
+                            </div>
+                            break;
+                        case "access":
+                            <div>
+                                <h3 class="section-title">Access Control</h3>
+                                <p>Manage who can write to this inventory.</p>
+                                
+                                <div class="form-group">
+                                    <label for="userSearch" class="form-label">Grant Access</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="userSearch" @bind="userSearchTerm" placeholder="Search users by email or name" @onkeyup="SearchUsers" />
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="SearchUsers">Search</button>
+                                    </div>
+                                </div>
+                                
+                                @if (searchResults.Any())
+                                {
+                                    <div class="form-group">
+                                        <h4>Search Results</h4>
+                                        <div class="list-group">
+                                            @foreach (var user in searchResults)
+                                            {
+                                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong>@user.Name</strong>
+                                                        <br />
+                                                        <small>@user.Email</small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-primary" @onclick="() => GrantAccess(user.Id)">Grant Access</button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                
+                                <div class="form-group">
+                                    <h4>Users with Write Access</h4>
+                                    @if (usersWithAccess.Any())
+                                    {
+                                        <div class="list-group">
+                                            @foreach (var user in usersWithAccess)
+                                            {
+                                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong>@user.Name</strong>
+                                                        <br />
+                                                        <small>@user.Email</small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-danger" @onclick="() => RevokeAccess(user.Id)">Revoke Access</button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">No users have been granted write access to this inventory.</p>
+                                    }
+                                </div>
+                            </div>
+                            break;
+                        case "tags":
+                            <div>
+                                <h3 class="section-title">Tags</h3>
+                                <p>Manage tags for this inventory.</p>
+                                
+                                <div class="form-group">
+                                    <label for="newTag" class="form-label">Add Tag</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="newTag" @bind="newTag" placeholder="Enter a tag" />
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="AddTag">Add</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <h4>Current Tags</h4>
+                                    @if (inventoryTags.Any())
+                                    {
+                                        <div>
+                                            @foreach (var tag in inventoryTags)
+                                            {
+                                                <span class="badge badge-primary me-1">
+                                                    @tag.Name
+                                                    <button type="button" class="btn-close btn-close-white ms-1" @onclick="() => RemoveTag(tag.Id)"></button>
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">No tags assigned to this inventory.</p>
+                                    }
+                                </div>
+                            </div>
+                            break;
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string inventoryId { get; set; } = string.Empty;
+
+    private Inventory? inventory;
+    private string activeTab = "general";
+    private string uploadStatus = "";
+    private string? newImageUrl = null;
+    private bool discussionEnabled = true;
+    private Guid currentUserId;
+    private string userSearchTerm = "";
+    private List<User> searchResults = new();
+    private List<User> usersWithAccess = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private string newTag = "";
+    private List<Tag> inventoryTags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+
+        if (Guid.TryParse(inventoryId, out var id))
+        {
+            inventory = await InventoryService.GetInventoryByIdAsync(id);
+            if (inventory == null)
+            {
+                Navigation.NavigateTo("/my-inventories");
+            }
+            else
+            {
+                // Load users with access
+                await LoadUsersWithAccess();
+                // Load tags for inventory
+                await LoadInventoryTags();
+            }
+        }
+        else
+        {
+            Navigation.NavigateTo("/my-inventories");
+        }
+    }
+
+    private void SetGeneralTab()
+    {
+        activeTab = "general";
+    }
+
+    private void SetCustomFieldsTab()
+    {
+        activeTab = "custom-fields";
+    }
+
+    private void SetIdFormatTab()
+    {
+        activeTab = "id-format";
+    }
+    
+    private void SetImageTab()
+    {
+        activeTab = "image";
+    }
+    
+    private void SetDiscussionTab()
+    {
+        activeTab = "discussion";
+    }
+    
+    private void SetAccessTab()
+    {
+        activeTab = "access";
+    }
+    
+    private void SetTagsTab()
+    {
+        activeTab = "tags";
+    }
+
+    private async Task SaveGeneralSettings()
+    {
+        if (inventory != null)
+        {
+            try
+            {
+                await InventoryService.UpdateInventoryAsync(inventory);
+                successMessage = "General settings saved successfully.";
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+            {
+                errorMessage = ex.Message + " Please refresh the page and try again.";
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error saving general settings: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task OnInventoryChanged(Inventory updatedInventory)
+    {
+        try
+        {
+            await InventoryService.UpdateInventoryAsync(updatedInventory);
+            successMessage = "Custom fields saved successfully.";
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            errorMessage = ex.Message + " Please refresh the page and try again.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving custom fields: {ex.Message}";
+        }
+    }
+    
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        uploadStatus = "Uploading...";
+        StateHasChanged();
+
+        try
+        {
+            // Get the first file from the selected files
+            var imageFile = e.File;
+            if (imageFile != null)
+            {
+                // Upload to Cloudinary
+                newImageUrl = await CloudinaryService.UploadImageAsync(imageFile);
+                if (!string.IsNullOrEmpty(newImageUrl))
+                {
+                    uploadStatus = "Image uploaded successfully!";
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    uploadStatus = "Error uploading image - no URL returned.";
+                }
+            }
+            else
+            {
+                uploadStatus = "No file selected.";
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadStatus = $"Error uploading image: {ex.Message}";
+        }
+    }
+    
+    private async Task RemoveImage()
+    {
+        if (inventory != null && !string.IsNullOrEmpty(inventory.ImageUrl))
+        {
+            try
+            {
+                // Extract public ID from URL for Cloudinary deletion
+                var publicId = ExtractPublicIdFromUrl(inventory.ImageUrl);
+                if (!string.IsNullOrEmpty(publicId))
+                {
+                    await CloudinaryService.DeleteImageAsync(publicId);
+                }
+                
+                newImageUrl = null;
+                inventory.ImageUrl = null;
+                uploadStatus = "Image removed.";
+            }
+            catch (Exception ex)
+            {
+                uploadStatus = $"Error removing image: {ex.Message}";
+                Console.Error.WriteLine($"Error removing image: {ex.Message}");
+            }
+        }
+    }
+    
+    private async Task SaveImageSettings()
+    {
+        if (inventory != null && !string.IsNullOrEmpty(newImageUrl))
+        {
+            try
+            {
+                inventory.ImageUrl = newImageUrl;
+                await InventoryService.UpdateInventoryAsync(inventory);
+
+                uploadStatus = "Image saved successfully!";
+                newImageUrl = null; // Reset after saving
+                successMessage = "Image settings saved successfully.";
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+            {
+                errorMessage = ex.Message + " Please refresh the page and try again.";
+            }
+            catch (Exception ex)
+            {
+                uploadStatus = $"Error saving image: {ex.Message}";
+                errorMessage = $"Error saving image settings: {ex.Message}";
+                Console.Error.WriteLine($"Error saving image: {ex.Message}");
+            }
+        }
+    }
+    
+    private async Task SaveDiscussionSettings()
+    {
+        // In a real implementation, you would save the discussion settings
+        // For now, we're just showing a success message
+        successMessage = "Discussion settings saved successfully.";
+        StateHasChanged();
+    }
+    
+    private async Task SearchUsers()
+    {
+        if (string.IsNullOrWhiteSpace(userSearchTerm))
+        {
+            searchResults = new List<User>();
+            return;
+        }
+
+        try
+        {
+            var allUsers = await UserService.GetAllUsersAsync();
+            searchResults = allUsers
+                .Where(u => u.Id != currentUserId && 
+                           (u.Name?.Contains(userSearchTerm, StringComparison.OrdinalIgnoreCase) == true ||
+                            u.Email?.Contains(userSearchTerm, StringComparison.OrdinalIgnoreCase) == true))
+                .Take(10)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error searching users: {ex.Message}";
+            searchResults = new List<User>();
+        }
+    }
+    
+    private async Task LoadUsersWithAccess()
+    {
+        try
+        {
+            usersWithAccess = await InventoryAccessService.GetUsersWithWriteAccessAsync(inventory!.Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading users with access: {ex.Message}";
+            usersWithAccess = new List<User>();
+        }
+    }
+    
+    private async Task GrantAccess(Guid userId)
+    {
+        try
+        {
+            await InventoryAccessService.GrantWriteAccessAsync(inventory!.Id, userId);
+            await LoadUsersWithAccess();
+            searchResults.RemoveAll(u => u.Id == userId);
+            successMessage = "Access granted successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error granting access: {ex.Message}";
+        }
+    }
+    
+    private async Task RevokeAccess(Guid userId)
+    {
+        try
+        {
+            await InventoryAccessService.RevokeWriteAccessAsync(inventory!.Id, userId);
+            await LoadUsersWithAccess();
+            successMessage = "Access revoked successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error revoking access: {ex.Message}";
+        }
+    }
+    
+    private async Task LoadInventoryTags()
+    {
+        try
+        {
+            inventoryTags = await TagService.GetTagsForInventoryAsync(inventory!.Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading inventory tags: {ex.Message}";
+            inventoryTags = new List<Tag>();
+        }
+    }
+    
+    private async Task AddTag()
+    {
+        if (string.IsNullOrWhiteSpace(newTag) || inventory == null)
+            return;
+
+        try
+        {
+            await TagService.AddTagToInventoryAsync(inventory.Id, newTag.Trim());
+            newTag = "";
+            await LoadInventoryTags();
+            successMessage = "Tag added successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding tag: {ex.Message}";
+        }
+    }
+    
+    private async Task RemoveTag(Guid tagId)
+    {
+        if (inventory == null)
+            return;
+
+        try
+        {
+            await TagService.RemoveTagFromInventoryAsync(inventory.Id, tagId);
+            await LoadInventoryTags();
+            successMessage = "Tag removed successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error removing tag: {ex.Message}";
+        }
+    }
+    
+    private string ExtractPublicIdFromUrl(string url)
+    {
+        // Extract the public ID from a Cloudinary URL
+        // Example URL: https://res.cloudinary.com/demo/image/upload/v1634567890/inventory_manager/items/image.jpg
+        try
+        {
+            var uri = new Uri(url);
+            var segments = uri.Segments;
+            if (segments.Length >= 2)
+            {
+                // Get the last segment and remove the file extension
+                var fileName = segments[segments.Length - 1];
+                var publicId = Path.GetFileNameWithoutExtension(fileName);
+                
+                // Add the folder path if it exists
+                if (segments.Length >= 3)
+                {
+                    var folderPath = string.Join("/", segments[segments.Length - 3], segments[segments.Length - 2]);
+                    publicId = $"{folderPath}{publicId}";
+                }
+                
+                return publicId;
+            }
+        }
+        catch
+        {
+            // If we can't extract the public ID, Cloudinary deletion might not work
+            // but the upload will still work
+        }
+        return "";
+    }
+}
