@@ -365,8 +365,6 @@ FodyWeavers.xsd
 ## Custom entries for this project
 
 # Secrets and sensitive configuration
-**/appsettings.*.json
-!**/appsettings.json
 !.config/**
 
 # User secrets (dotnet user-secrets)
