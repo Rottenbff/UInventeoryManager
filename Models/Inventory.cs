@@ -85,6 +85,10 @@ namespace InventoryManager.Models
         [StringLength(1000)]
         public string? IdFormatSettings { get; set; }
 
+        // Sequence Number State
+        public long SequenceLastValue { get; set; }
+        public DateTime SequenceLastUpdated { get; set; }
+
         public virtual ICollection<Item> Items { get; set; } = new List<Item>();
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public virtual ICollection<InventoryTag> InventoryTags { get; set; } = new List<InventoryTag>();

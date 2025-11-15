@@ -1,4 +1,5 @@
 @using InventoryManager.Models
+@using System.Text.Json
 @inject ICustomIdGeneratorService CustomIdGeneratorService
 @inject IInventoryService InventoryService
 @rendermode InteractiveServer
@@ -233,6 +234,23 @@
     {
         FormatComponents = new List<IdFormatComponent>();
 
+        if (Inventory.IdFormatEnabled && !string.IsNullOrEmpty(Inventory.IdFormatSettings))
+        {
+            try
+            {
+                var components = JsonSerializer.Deserialize<List<IdFormatComponent>>(Inventory.IdFormatSettings);
+                if (components != null)
+                {
+                    FormatComponents = components;
+                    return;
+                }
+            }
+            catch (JsonException)
+            {
+                // Fallback to old format if JSON is invalid
+            }
+        }
+
         // Check if inventory has saved format components
         if (Inventory.IdFormatEnabled && !string.IsNullOrEmpty(Inventory.IdFormatComponents))
         {
@@ -427,21 +445,18 @@
 
     private async Task SaveIdFormat()
     {
-        if (isSaving) return; // Prevent multiple saves
+        if (isSaving) return;
 
         try
         {
             isSaving = true;
             await InvokeAsync(StateHasChanged);
 
-            // Update the inventory properties
-            Inventory.IdFormatEnabled = true;
             Inventory.IdFormatComponents = string.Join(",", FormatComponents.Select(c => c.Type));
+            Inventory.IdFormatSettings = JsonSerializer.Serialize(FormatComponents);
 
-            // Actually save to the database
             await InventoryService.UpdateInventoryAsync(Inventory);
 
-            // Show success message briefly
             previewId = "ID format saved successfully!";
             await InvokeAsync(StateHasChanged);
             await Task.Delay(1500);
