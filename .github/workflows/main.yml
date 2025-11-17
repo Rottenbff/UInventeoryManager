@@ -13,14 +13,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
+    - name: Set Profile Path Variable
+      id: set_path
+      run: |
+        $RepoRoot = "D:\a\UInventeoryManager\UInventeoryManager"
+        $ProfilePath = Join-Path $RepoRoot "Properties\RunASP.pubxml"
+        echo "PROFILE_PATH=$ProfilePath" >> $env:GITHUB_ENV
+      shell: pwsh
+      
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'
+        dotnet-version: '8.x' 
     
     - name: Restore dependencies
       run: dotnet restore InventoryManager.csproj
     
     - name: Publish and Deploy
       run: |
-        dotnet publish InventoryManager.csproj -c Release /p:PublishProfile=Properties/RunASP.pubxml /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} /p:AllowUntrustedCertificate=true
+        dotnet publish InventoryManager.csproj -c Release /p:PublishProfile=$env:PROFILE_PATH /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} /p:AllowUntrustedCertificate=true
