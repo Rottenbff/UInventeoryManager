@@ -1,4 +1,4 @@
-name: Deploy Blazor to RunASP
+name: Deploy Blazor to RunASP (Direct Config)
 
 on:
   push:
@@ -13,22 +13,23 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    - name: Set Profile Path Variable
-      id: set_path
-      run: |
-        $RepoRoot = "D:\a\UInventeoryManager\UInventeoryManager"
-        $ProfilePath = Join-Path $RepoRoot "Properties\RunASP.pubxml"
-        echo "PROFILE_PATH=$ProfilePath" >> $env:GITHUB_ENV
-      shell: pwsh
-      
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x' 
+        # Using a specific stable version
+        dotnet-version: '8.0.x' 
     
     - name: Restore dependencies
+      # We know the project is at the root
       run: dotnet restore InventoryManager.csproj
     
-    - name: Publish and Deploy
+    - name: Publish and Deploy (MSDeploy)
       run: |
-        dotnet publish InventoryManager.csproj -c Release /p:PublishProfile=$env:PROFILE_PATH /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} /p:AllowUntrustedCertificate=true
+        dotnet publish InventoryManager.csproj -c Release `
+          /p:WebPublishMethod=MSDeploy `
+          /p:MSDeployServiceURL=https://site41907.siteasp.net:8172/msdeploy.axd `
+          /p:DeployIisAppPath=site41907 `
+          /p:MSDeployPublishMethod=WMSVC `
+          /p:UserName=site41907 `
+          /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} `
+          /p:AllowUntrustedCertificate=true
