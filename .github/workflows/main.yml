@@ -16,13 +16,11 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        # Using '8.x' will ensure you get the latest stable 8.0 SDK
         dotnet-version: '8.x'
     
     - name: Restore dependencies
-      # Explicitly targeting the project file path
-      run: dotnet restore UInventeoryManager/InventoryManager.csproj
+      run: dotnet restore InventoryManager.csproj
     
     - name: Publish and Deploy
       run: |
-        dotnet publish UInventeoryManager/InventoryManager.csproj -c Release /p:PublishProfile=RunASP /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} /p:AllowUntrustedCertificate=true
+        dotnet publish InventoryManager.csproj -c Release /p:PublishProfile=RunASP /p:Password=${{ secrets.WEBDEPLOY_PASSWORD }} /p:AllowUntrustedCertificate=true
